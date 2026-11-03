@@ -1,18 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, Check, ExternalLink, Maximize2, Minimize2, Minus, Pin, PinOff } from 'lucide-react';
+import { Bell, Check, ExternalLink, Maximize2, Minimize2, Minus, PictureInPicture2, Pin, PinOff, X } from 'lucide-react';
 import { TaskCard } from '../components/TaskCard';
 import { TaskComposer } from '../components/TaskComposer';
 import { ConnectionPill } from '../components/ui';
-import { desktop, type HostState } from '../lib/desktop';
+import { desktop, isDesktop, type HostState } from '../lib/desktop';
+import { navigate } from '../lib/router';
+import { floatingWidgetSupported, openFloatingWidget } from '../lib/pip';
 import { relativeTime } from '../lib/format';
 import { markNotificationsRead, openTask, useStore } from '../lib/store';
 import { dueBucket, selectAssigned, selectMy } from '../lib/views';
 
 /**
- * Floating Windows widget (loaded by the WebView2 host at /widget).
+ * The widget UI, used in three places:
+ *  - "host": inside the native Windows app (WebView2) — pin, tray, drag and size come from the host;
+ *  - "browser": the /widget route in Edge, e.g. an installed Edge app window sized like a widget;
+ *  - "pip": the pop-out always-on-top window (Document Picture-in-Picture), no install needed.
  * Compact: counts + next tasks + quick add. Expanded: tabs for My Tasks, Assigned and Alerts.
  */
-export function WidgetPage({ onReconnect }: { onReconnect: () => void }) {
+export function WidgetPage({
+  onReconnect,
+  variant = isDesktop ? 'host' : 'browser',
+  onClose,
+}: {
+  onReconnect?: () => void;
+  variant?: 'host' | 'browser' | 'pip';
+  onClose?: () => void;
+}) {
   const me = useStore((s) => s.me)!;
   const tasks = useStore((s) => s.tasks);
   const connection = useStore((s) => s.connection);
@@ -20,8 +33,10 @@ export function WidgetPage({ onReconnect }: { onReconnect: () => void }) {
   const notifications = useStore((s) => s.notifications);
   const unread = useStore((s) => s.unreadCount);
   const [host, setHost] = useState<HostState | null>(null);
+  const [localMode, setLocalMode] = useState<'compact' | 'expanded'>(variant === 'pip' ? 'expanded' : 'compact');
   const [tab, setTab] = useState<'my' | 'assigned' | 'alerts'>('my');
-  const mode = host?.mode ?? 'compact';
+  const mode = variant === 'host' ? (host?.mode ?? 'compact') : localMode;
+  const isHost = variant === 'host';
 
   useEffect(() => {
     const off = desktop.onMessage((m) => m.type === 'hostState' && setHost(m.state));
@@ -37,8 +52,14 @@ export function WidgetPage({ onReconnect }: { onReconnect: () => void }) {
   useEffect(() => desktop.setBadge(my.length), [my.length]);
 
   const setMode = (m: 'compact' | 'expanded') => {
+    if (!isHost) return setLocalMode(m);
     desktop.setMode(m);
     setHost((h) => (h ? { ...h, mode: m } : h));
+  };
+  const openDashboard = () => {
+    if (isHost) desktop.openDashboard('/');
+    else if (variant === 'pip') window.focus(); // the dashboard is the window that opened this one
+    else navigate('/');
   };
 
   const list = tab === 'my' ? my : assigned;
@@ -48,7 +69,7 @@ export function WidgetPage({ onReconnect }: { onReconnect: () => void }) {
       <div
         className="widget-bar glass"
         onMouseDown={(e) => {
-          if ((e.target as HTMLElement).closest('button') || e.button !== 0) return;
+          if (!isHost || (e.target as HTMLElement).closest('button') || e.button !== 0) return;
           desktop.startDrag();
         }}
         onDoubleClick={(e) => !(e.target as HTMLElement).closest('button') && setMode(mode === 'compact' ? 'expanded' : 'compact')}
@@ -59,22 +80,36 @@ export function WidgetPage({ onReconnect }: { onReconnect: () => void }) {
         <strong style={{ fontFamily: 'var(--font-display)', fontSize: 13.5 }}>TaskSync</strong>
         <span className="spacer" />
         <ConnectionPill status={connection} queued={queued} onRetry={onReconnect} />
-        <button className={`icon-btn ${host?.alwaysOnTop ? 'on' : ''}`} title={host?.alwaysOnTop ? 'Unpin from top' : 'Keep on top'} onClick={() => {
-          const v = !host?.alwaysOnTop;
-          desktop.setAlwaysOnTop(v);
-          setHost((h) => (h ? { ...h, alwaysOnTop: v } : h));
-        }}>
-          {host?.alwaysOnTop ? <PinOff size={14} /> : <Pin size={14} />}
-        </button>
+        {isHost && (
+          <button className={`icon-btn ${host?.alwaysOnTop ? 'on' : ''}`} title={host?.alwaysOnTop ? 'Unpin from top' : 'Keep on top'} onClick={() => {
+            const v = !host?.alwaysOnTop;
+            desktop.setAlwaysOnTop(v);
+            setHost((h) => (h ? { ...h, alwaysOnTop: v } : h));
+          }}>
+            {host?.alwaysOnTop ? <PinOff size={14} /> : <Pin size={14} />}
+          </button>
+        )}
+        {variant === 'browser' && floatingWidgetSupported() && (
+          <button className="icon-btn" title="Pop out (always on top)" onClick={() => void openFloatingWidget()}>
+            <PictureInPicture2 size={14} />
+          </button>
+        )}
         <button className="icon-btn" title={mode === 'compact' ? 'Expand' : 'Compact'} onClick={() => setMode(mode === 'compact' ? 'expanded' : 'compact')}>
           {mode === 'compact' ? <Maximize2 size={14} /> : <Minimize2 size={14} />}
         </button>
-        <button className="icon-btn" title="Open full dashboard" onClick={() => desktop.openDashboard('/')}>
+        <button className="icon-btn" title="Open full dashboard" onClick={openDashboard}>
           <ExternalLink size={14} />
         </button>
-        <button className="icon-btn" title="Minimise to tray" onClick={() => desktop.minimizeToTray()}>
-          <Minus size={14} />
-        </button>
+        {isHost && (
+          <button className="icon-btn" title="Minimise to tray" onClick={() => desktop.minimizeToTray()}>
+            <Minus size={14} />
+          </button>
+        )}
+        {variant === 'pip' && onClose && (
+          <button className="icon-btn" title="Close floating widget" onClick={onClose}>
+            <X size={14} />
+          </button>
+        )}
       </div>
 
       <div className="widget-stats">
@@ -113,7 +148,16 @@ export function WidgetPage({ onReconnect }: { onReconnect: () => void }) {
               </button>
             )}
             {notifications.slice(0, 30).map((n) => (
-              <button key={n.id} className="menu-item glass" style={{ padding: 10, opacity: n.readAt ? 0.65 : 1 }} onClick={() => n.taskId && openTask(n.taskId)}>
+              <button
+                key={n.id}
+                className="menu-item glass"
+                style={{ padding: 10, opacity: n.readAt ? 0.65 : 1 }}
+                onClick={() => {
+                  if (!n.taskId) return;
+                  openTask(n.taskId);
+                  if (variant === 'pip') window.focus();
+                }}
+              >
                 <span className="col" style={{ gap: 0 }}>
                   <span>{n.title}</span>
                   <span className="sub">{relativeTime(n.createdAt)}</span>

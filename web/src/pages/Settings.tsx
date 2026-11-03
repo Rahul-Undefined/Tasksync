@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { Preferences } from '@tasksync/shared';
-import { Bell, LogOut, Monitor, Save, UserRound } from 'lucide-react';
+import { Bell, Download, LogOut, Monitor, PictureInPicture2, Save, UserRound } from 'lucide-react';
 import { Avatar, Switch } from '../components/ui';
 import { desktop, isDesktop, type HostState } from '../lib/desktop';
+import { floatingWidgetSupported, openFloatingWidget } from '../lib/pip';
+import { isInstalledApp, promptInstall, useCanInstall } from '../lib/pwa';
 import { savePreferences, saveProfile, toast, toastError, useStore } from '../lib/store';
 
 export function SettingsPage({ onSignOut, version }: { onSignOut: () => void; version: string }) {
@@ -56,9 +58,9 @@ export function SettingsPage({ onSignOut, version }: { onSignOut: () => void; ve
   return (
     <div className="content-inner" style={{ maxWidth: 760 }}>
       <section className="glass" style={{ padding: 20 }}>
-        <div className="row" style={{ gap: 14, marginBottom: 16 }}>
+        <div className="row wrap" style={{ gap: 14, marginBottom: 16 }}>
           <Avatar id={me.id} name={me.displayName} size="lg" />
-          <div className="col" style={{ gap: 0 }}>
+          <div className="col" style={{ gap: 0, minWidth: 0, flex: '1 1 180px' }}>
             <strong style={{ fontSize: 17 }}>{me.displayName}</strong>
             <span className="muted small">{me.email} · {me.role === 'admin' ? 'Administrator' : 'Employee'}</span>
           </div>
@@ -130,10 +132,7 @@ export function SettingsPage({ onSignOut, version }: { onSignOut: () => void; ve
           <Monitor size={14} /> Windows desktop app
         </div>
         {!isDesktop ? (
-          <p className="muted small" style={{ margin: 0 }}>
-            Install the TaskSync desktop companion for a floating widget, tray icon and Windows notifications. These settings appear here when you open
-            Settings from the desktop app.
-          </p>
+          <DesktopWithoutInstall />
         ) : !host ? (
           <p className="muted small">Connecting to the desktop app…</p>
         ) : (
@@ -201,6 +200,54 @@ export function SettingsPage({ onSignOut, version }: { onSignOut: () => void; ve
         )}
       </section>
       <p className="faint tiny" style={{ textAlign: 'center' }}>TaskSync {version} · Omnifi internal use only</p>
+    </div>
+  );
+}
+
+/** TaskSync on the Windows desktop with no installer: an Edge app window plus the pop-out widget. */
+function DesktopWithoutInstall() {
+  const canInstall = useCanInstall();
+  const installed = isInstalledApp();
+  return (
+    <div className="col" style={{ gap: 14 }}>
+      <div className="row wrap" style={{ gap: 14 }}>
+        <div className="col" style={{ gap: 0, flex: '1 1 240px' }}>
+          <strong>{installed ? 'Installed as an app' : 'Install TaskSync as an app'}</strong>
+          <span className="small faint">
+            {installed
+              ? 'TaskSync has its own window and taskbar icon. To open it when Windows starts: open edge://apps, right-click TaskSync and tick “Start automatically when you sign in”.'
+              : 'Uses Microsoft Edge, so no download or admin rights are needed. You get a TaskSync window, taskbar icon with a task count, and Windows notifications.'}
+          </span>
+        </div>
+        {!installed &&
+          (canInstall ? (
+            <button className="btn btn-primary" onClick={() => void promptInstall()}>
+              <Download size={15} /> Install
+            </button>
+          ) : (
+            <span className="small faint" style={{ maxWidth: 220 }}>
+              In Edge: menu (…) → Apps → Install this site as an app
+            </span>
+          ))}
+      </div>
+      <div className="row wrap" style={{ gap: 14 }}>
+        <div className="col" style={{ gap: 0, flex: '1 1 240px' }}>
+          <strong>Floating widget</strong>
+          <span className="small faint">
+            A small always-on-top TaskSync window. It stays open while the main TaskSync window or tab is open (it can be minimised).
+          </span>
+        </div>
+        {floatingWidgetSupported() ? (
+          <button className="btn" onClick={() => void openFloatingWidget()}>
+            <PictureInPicture2 size={15} /> Pop out
+          </button>
+        ) : (
+          <span className="small faint">Needs Microsoft Edge 116+</span>
+        )}
+      </div>
+      <p className="tiny faint" style={{ margin: 0 }}>
+        The native Windows companion (hidden from screen sharing, stays on Win+D) needs IT to approve its installer on Omnifi PCs.
+      </p>
     </div>
   );
 }

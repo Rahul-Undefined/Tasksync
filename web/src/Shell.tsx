@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Bell, Check, CheckCheck, CloudOff, Inbox, ListTodo, Send, Settings, ShieldCheck, Users, X } from 'lucide-react';
+import { Activity, Bell, Check, CheckCheck, CloudOff, Inbox, ListTodo, PictureInPicture2, Send, Settings, ShieldCheck, Users, X } from 'lucide-react';
+import { floatingWidgetSupported, openFloatingWidget } from './lib/pip';
+import { setTaskbarBadge } from './lib/pwa';
 import { PersonMenuHost } from './components/PersonMenu';
 import { TaskDrawer } from './components/TaskDrawer';
 import { Avatar, ConnectionPill } from './components/ui';
@@ -50,6 +52,7 @@ export function Shell({ onSignOut, onReconnect, version }: { onSignOut: () => vo
   useEffect(() => {
     document.title = counts['/'] ? `(${counts['/']}) ${current.label} · TaskSync` : `${current.label} · TaskSync`;
   }, [counts, current.label]);
+  useEffect(() => setTaskbarBadge(counts['/'] ?? 0), [counts]);
 
   let page: React.ReactNode;
   if (path === '/assigned') page = <AssignedByMePage />;
@@ -106,6 +109,11 @@ export function Shell({ onSignOut, onReconnect, version }: { onSignOut: () => vo
           <span className="hide-mobile" style={{ display: 'contents' }}>
             {connection !== 'live' && connection !== 'polling' && <ConnectionPill status={connection} queued={queued} onRetry={onReconnect} />}
           </span>
+          {floatingWidgetSupported() && (
+            <button className="btn btn-sm hide-mobile" onClick={() => void openFloatingWidget()} title="Open a small always-on-top TaskSync window">
+              <PictureInPicture2 size={15} /> Pop out widget
+            </button>
+          )}
           <button className="icon-btn show-mobile" onClick={() => navigate('/settings')} aria-label="Settings">
             <Settings size={18} />
           </button>

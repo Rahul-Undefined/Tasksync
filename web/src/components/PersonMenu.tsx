@@ -5,6 +5,7 @@ import { get } from '../lib/api';
 import { formatDateTime } from '../lib/format';
 import { navigate } from '../lib/router';
 import { getState, toast, toastError } from '../lib/store';
+import { useSurface } from '../lib/surface';
 import { messageInTeams } from '../lib/teams';
 import { Avatar, Modal, Spinner } from './ui';
 
@@ -40,6 +41,8 @@ const close = () => {
 
 /** A clickable employee name that opens the Teams / Profile / Tasks context menu. */
 export function PersonLink({ user, task, children }: { user: UserSummary; task?: Task; children?: React.ReactNode }) {
+  const surface = useSurface();
+  if (surface === 'pip') return <span style={{ fontWeight: 600 }}>{children ?? user.displayName}</span>;
   return (
     <button
       type="button"

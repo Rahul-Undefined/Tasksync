@@ -1,6 +1,9 @@
-# Generates desktop/TaskSync.Desktop/Assets/tasksync.ico (PNG-compressed ICO, 16-256 px)
-# from code so the icon can be rebuilt without design tools.
-param([string]$Out = "$PSScriptRoot\..\desktop\TaskSync.Desktop\Assets\tasksync.ico")
+# Generates desktop/TaskSync.Desktop/Assets/tasksync.ico (PNG-compressed ICO, 16-256 px) and the
+# web app icons (web/public/icon-192.png, icon-512.png) from code, without design tools.
+param(
+  [string]$Out = "$PSScriptRoot\..\desktop\TaskSync.Desktop\Assets\tasksync.ico",
+  [string]$WebDir = "$PSScriptRoot\..\web\public"
+)
 Add-Type -AssemblyName System.Drawing
 
 function New-IconPng([int]$size) {
@@ -57,3 +60,9 @@ for ($i = 0; $i -lt $sizes.Count; $i++) {
 foreach ($img in $images) { $w.Write($img) }
 $w.Close()
 Write-Output "Wrote $Out"
+
+# PNG icons for the installable web app (Edge "Install this site as an app").
+foreach ($s in 192, 512) {
+  [System.IO.File]::WriteAllBytes((Join-Path (Resolve-Path $WebDir) "icon-$s.png"), (New-IconPng $s))
+  Write-Output "Wrote icon-$s.png"
+}

@@ -122,6 +122,28 @@ describe('Web dashboard in Microsoft Edge', () => {
     await ctx.close();
   });
 
+  test('[T19] no-install desktop: Edge app manifest and a pop-out always-on-top widget that updates live', async () => {
+    const manifest = await (await fetch(`${server.base}/manifest.webmanifest`)).json();
+    assert.equal(manifest.name, 'TaskSync');
+    assert.equal(manifest.display, 'standalone');
+    for (const icon of manifest.icons) assert.equal((await fetch(`${server.base}${icon.src}`)).status, 200, icon.src);
+
+    await admin.getByRole('button', { name: 'My Tasks' }).first().click();
+    const supported = await admin.evaluate(() => 'documentPictureInPicture' in window);
+    assert.ok(supported, 'Edge should support Document Picture-in-Picture');
+    await admin.getByRole('button', { name: /Pop out widget/ }).click();
+    await admin.waitForFunction(() => window.documentPictureInPicture?.window?.document.querySelector('.widget .stat'), null, { timeout: 10000 });
+
+    const adminUser = await api.me(ADMIN);
+    await api.call(ALEX, 'POST', '/api/tasks', { title: 'Seen in the floating widget', assigneeIds: [adminUser.id] });
+    await admin.waitForFunction(
+      () => window.documentPictureInPicture?.window?.document.body.innerText.includes('Seen in the floating widget'),
+      null,
+      { timeout: 10000 },
+    );
+    await admin.evaluate(() => window.documentPictureInPicture.window.close());
+  });
+
   test('[T4][T5] a new employee waits for approval and gets in as soon as an admin approves', async () => {
     const samCtx = await browser.newContext();
     const sam = await samCtx.newPage();

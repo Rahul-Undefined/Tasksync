@@ -3,6 +3,7 @@ import { isActiveStatus, mentionsToPlainText, type Task } from '@tasksync/shared
 import { CalendarClock, Check, ChevronRight, MessageSquare, Play } from 'lucide-react';
 import { formatDue, relativeTime } from '../lib/format';
 import { changeStatus, openTask, toast, toastError } from '../lib/store';
+import { useSurface } from '../lib/surface';
 import { PersonLink } from './PersonMenu';
 import { Avatar, PriorityBadge, StatusBadge } from './ui';
 
@@ -16,6 +17,11 @@ interface Props {
 
 export const TaskCard = memo(function TaskCard({ task, meId, compact, perspective = 'any' }: Props) {
   const [busy, setBusy] = useState(false);
+  const surface = useSurface();
+  const open_ = () => {
+    openTask(task.id);
+    if (surface === 'pip') window.focus(); // details open in the dashboard window
+  };
   const active = task.assignees.filter((a) => a.status === 'active');
   const amAssignee = active.some((a) => a.user.id === meId);
   const amCreator = task.createdBy.id === meId;
@@ -59,8 +65,8 @@ export const TaskCard = memo(function TaskCard({ task, meId, compact, perspectiv
     <article
       className={`task-card glass ${closed ? 'closed' : ''}`}
       tabIndex={0}
-      onClick={() => openTask(task.id)}
-      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && openTask(task.id)}
+      onClick={open_}
+      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && open_()}
       aria-label={task.title}
     >
       <button
