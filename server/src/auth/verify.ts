@@ -7,6 +7,8 @@ export const MSA_CONSUMER_TENANT = '9188040d-6c67-4c5b-b112-36a304b66dad';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface VerifiedIdentity {
+  /** "id" = Entra ID token for this app (no admin consent needed); "access" = access token for the exposed API. */
+  tokenKind: 'id' | 'access';
   oid: string;
   tid: string;
   email: string;
@@ -23,6 +25,12 @@ export interface TokenVerifierOptions {
   allowedEmailDomains: string[];
   allowGuests?: boolean;
   requiredRole?: string;
+  /**
+   * Accept Entra ID tokens issued to this app (audience = client id). This is what lets TaskSync
+   * work without an admin: sign-in only needs openid/profile/email, which employees can consent to
+   * themselves. Access tokens for api://<client-id>/<scope> are always accepted too.
+   */
+  acceptIdTokens?: boolean;
   /** Override the signing keys (tests and local development sign-in). */
   keySet?: JWTVerifyGetKey;
 }
@@ -34,6 +42,23 @@ export class AuthError extends ApiError {
     super(status, code, message);
     this.name = 'AuthError';
   }
+}
+
+/**
+ * An Entra v2 ID token issued to this app: audience is exactly the client id, v2 issuer, and no
+ * azp/appid (those only appear in access tokens, including app-only ones).
+ */
+function isIdTokenForThisApp(claims: Record<string, unknown>, clientId: string, v2Issuer: string): boolean {
+  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  return (
+    aud.length === 1 &&
+    String(aud[0]).toLowerCase() === clientId &&
+    claims.iss === v2Issuer &&
+    claims.ver === '2.0' &&
+    claims.azp === undefined &&
+    claims.appid === undefined &&
+    claims.idtyp !== 'app'
+  );
 }
 
 export function emailDomainAllowed(email: string, domains: string[]): boolean {
@@ -106,8 +131,15 @@ export function createTokenVerifier(opts: TokenVerifierOptions): TokenVerifier {
     }
 
     const scopes = typeof claims.scp === 'string' ? claims.scp.split(' ').filter(Boolean) : [];
-    if (!scopes.includes(opts.scope)) {
-      // App-only tokens (no scp) or tokens for other APIs are rejected.
+    let tokenKind: VerifiedIdentity['tokenKind'];
+    if (scopes.length > 0) {
+      // Delegated access token: must be for TaskSync's own scope.
+      if (!scopes.includes(opts.scope)) throw new AuthError('insufficient_scope', 'Token is not valid for TaskSync', 403);
+      tokenKind = 'access';
+    } else if (opts.acceptIdTokens && isIdTokenForThisApp(claims, clientId, issuers[0]!)) {
+      tokenKind = 'id';
+    } else {
+      // App-only access tokens (no scp, carry azp/appid) and anything else are rejected.
       throw new AuthError('insufficient_scope', 'Token is not valid for TaskSync', 403);
     }
 
@@ -131,6 +163,7 @@ export function createTokenVerifier(opts: TokenVerifierOptions): TokenVerifier {
 
     const name = String(claims.name ?? '').trim() || email.split('@')[0] || email;
     return {
+      tokenKind,
       oid,
       tid,
       email,

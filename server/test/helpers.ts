@@ -50,6 +50,7 @@ export async function createTestEnv(envOverrides: Record<string, string> = {}): 
     scope: 'access_as_user',
     allowedEmailDomains: [DOMAIN],
     requiredRole: envOverrides.ENTRA_REQUIRED_ROLE,
+    acceptIdTokens: envOverrides.ENTRA_TOKEN_MODE !== 'access',
     keySet: createLocalJWKSet({ keys: [jwk] }),
   });
   const config = loadConfig({

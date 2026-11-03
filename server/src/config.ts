@@ -43,6 +43,12 @@ const envSchema = z.object({
   ENTRA_TENANT_ID: uuid.optional(),
   ENTRA_CLIENT_ID: uuid.optional(),
   ENTRA_API_SCOPE: z.string().default('access_as_user'),
+  /**
+   * id (default): the web app signs in with openid/profile/email only and sends the ID token —
+   * no "Expose an API" setup and no admin consent needed.
+   * access: the web app requests api://<client-id>/<scope> access tokens (needs the API exposed + consent).
+   */
+  ENTRA_TOKEN_MODE: z.enum(['id', 'access']).default('id'),
   /** Optional Entra app role every user must hold (e.g. TaskSync.User). */
   ENTRA_REQUIRED_ROLE: z.string().trim().optional().transform((v) => v || undefined),
   ALLOW_GUEST_ACCOUNTS: boolish,
@@ -76,6 +82,7 @@ export interface AppConfig {
     tenantId?: string;
     clientId?: string;
     scope: string;
+    tokenMode: 'id' | 'access';
     requiredRole?: string;
     allowGuests: boolean;
   };
@@ -132,6 +139,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       tenantId: e.ENTRA_TENANT_ID,
       clientId: e.ENTRA_CLIENT_ID,
       scope: e.ENTRA_API_SCOPE,
+      tokenMode: e.ENTRA_TOKEN_MODE,
       requiredRole: e.ENTRA_REQUIRED_ROLE,
       allowGuests: e.ALLOW_GUEST_ACCOUNTS,
     },

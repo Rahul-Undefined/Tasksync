@@ -50,7 +50,11 @@ export async function systemRoutes(app: FastifyInstance, ctx: RouteContext): Pro
           tenantId: config.entra.tenantId!,
           clientId: config.entra.clientId!,
           authority: `https://login.microsoftonline.com/${config.entra.tenantId}`,
-          scopes: [`api://${config.entra.clientId}/${config.entra.scope}`],
+          tokenType: config.entra.tokenMode,
+          scopes:
+            config.entra.tokenMode === 'id'
+              ? ['openid', 'profile', 'email']
+              : [`api://${config.entra.clientId}/${config.entra.scope}`],
         }
       : null;
     return {

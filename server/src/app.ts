@@ -64,6 +64,7 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
           allowedEmailDomains: config.allowedEmailDomains,
           allowGuests: config.entra.allowGuests,
           requiredRole: config.entra.requiredRole,
+          acceptIdTokens: config.entra.tokenMode === 'id',
         })
       : null;
     const dev = devAuth

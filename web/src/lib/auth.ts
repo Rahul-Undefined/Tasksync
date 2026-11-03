@@ -8,7 +8,7 @@ import { isDesktop } from './desktop';
 
 export interface ClientConfig {
   authMode: 'entra' | 'dev' | 'not_configured';
-  entra: { tenantId: string; clientId: string; authority: string; scopes: string[] } | null;
+  entra: { tenantId: string; clientId: string; authority: string; scopes: string[]; tokenType: 'id' | 'access' } | null;
   allowedDomains: string[];
   databaseConfigured: boolean;
   version: string;
@@ -26,6 +26,16 @@ export interface AuthClient {
 // ---------------------------------------------------------------------------
 // Microsoft Entra ID (production)
 // ---------------------------------------------------------------------------
+
+/** Seconds until a JWT expires (0 if unreadable). Only used to decide when to refresh. */
+export function secondsLeft(jwt: string | undefined, now = Date.now()): number {
+  try {
+    const payload = JSON.parse(atob(jwt!.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number };
+    return payload.exp ? payload.exp - Math.floor(now / 1000) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 export async function createEntraAuth(cfg: NonNullable<ClientConfig['entra']>, allowedDomains: string[]): Promise<AuthClient> {
   const pca = new PublicClientApplication({
@@ -73,8 +83,14 @@ export async function createEntraAuth(cfg: NonNullable<ClientConfig['entra']>, a
     async getToken(opts) {
       if (!account) throw new Error('Not signed in');
       try {
-        const res = await pca.acquireTokenSilent({ ...request(), forceRefresh: opts?.forceRefresh ?? false });
-        return res.accessToken;
+        let res = await pca.acquireTokenSilent({ ...request(), forceRefresh: opts?.forceRefresh ?? false });
+        if (cfg.tokenType === 'access') return res.accessToken;
+        // ID-token mode (no admin consent needed): the API accepts the ID token issued to this app.
+        // MSAL may hand back a cached ID token close to expiry, so refresh it with a few minutes to spare.
+        if (!opts?.forceRefresh && secondsLeft(res.idToken) < 300) {
+          res = await pca.acquireTokenSilent({ ...request(), forceRefresh: true });
+        }
+        return res.idToken;
       } catch (err) {
         if (err instanceof InteractionRequiredAuthError) {
           await pca.acquireTokenRedirect({ ...request(), state: window.location.pathname });
