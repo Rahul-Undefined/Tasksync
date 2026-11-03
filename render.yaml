@@ -1,0 +1,30 @@
+# Render Blueprint for TaskSync (free tier). See DEPLOYMENT_GUIDE.md.
+# The existing service tasksync-vgam was created in the dashboard; you can either copy these
+# settings into it by hand (recommended, keeps the URL) or link this Blueprint to it.
+services:
+  - type: web
+    name: tasksync
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: ALLOWED_EMAIL_DOMAINS
+        value: myomnifi.com
+      - key: PUBLIC_BASE_URL
+        value: https://tasksync-vgam.onrender.com
+      # Secrets / tenant-specific values: set in the Render dashboard (never commit them).
+      - key: DATABASE_URL
+        sync: false
+      - key: ENTRA_TENANT_ID
+        sync: false
+      - key: ENTRA_CLIENT_ID
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAILS
+        sync: false
