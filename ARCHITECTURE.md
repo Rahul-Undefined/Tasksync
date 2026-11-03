@@ -14,7 +14,7 @@
               │                              └──────────────────────────────┘     │ public grants  │
               │ MSAL (PKCE, SPA)                                                   └────────────────┘
               ▼
-   Microsoft Entra ID (Omnifi tenant, single-tenant app "TaskSync", scope access_as_user)
+   Microsoft Entra ID (Omnifi tenant, single-tenant app "TaskSync", openid/profile/email; no admin consent)
 ```
 
 One Render service hosts both the API and the built React app, so the dashboard and API share an origin (no CORS
@@ -97,12 +97,19 @@ Unknown and forbidden task ids both return `404` so ids can't be probed.
 
 1. The web app loads `/api/config` (tenant id, client id, scope; none of these are secret).
 2. MSAL (`@azure/msal-browser`, auth code + PKCE, redirect flow) signs the user in against
-   `https://login.microsoftonline.com/<tenant-id>` and gets an access token for `api://<client-id>/access_as_user`.
+   `https://login.microsoftonline.com/<tenant-id>`. **Default (`ENTRA_TOKEN_MODE=id`):** it asks only for
+   `openid profile email` and sends the **ID token** (audience = the TaskSync client ID), which employees can consent
+   to themselves, so no Entra admin is involved. The client refreshes it a few minutes before expiry. The server only
+   accepts it if it is a v2 ID token for *this* app (exact audience, v2 issuer, no `azp`/`appid`, not app-only).
+   **Optional (`ENTRA_TOKEN_MODE=access`):** with an admin-exposed API it uses access tokens for
+   `api://<client-id>/access_as_user` instead. The trade-off: Microsoft recommends access tokens for separate APIs;
+   here the API and the SPA are one app registration and one origin, so the ID token's audience already pins it to
+   TaskSync.
    The token cache is in `localStorage` (inside the WebView2 profile for the desktop app), so people stay signed in
    until they sign out or the session expires.
 3. Every API call sends `Authorization: Bearer <token>`. The server verifies the RS256 signature against the
-   tenant's JWKS, the issuer, audience, expiry, `tid`, guest/external flags (`acct`, `idp`, `#EXT#`), the scope,
-   an optional app role, and the email domain. It then loads the user by `oid` and requires `status = approved`.
+   tenant's JWKS, the issuer, audience, expiry, `tid`, guest/external flags (`acct`, `idp`, `#EXT#`), the token
+   kind (ID token for this app, or access token with the TaskSync scope), an optional app role, and the email domain. It then loads the user by `oid` and requires `status = approved`.
 4. Unknown employees are registered as `pending`, and admins get a live notification to approve them.
 
 ## Real-time protocol
@@ -142,6 +149,18 @@ Clients:
 | `HostServices.cs` | Clipboard (PNG-signature checked), Teams launch with web fallback, test log |
 | `AutoStart.cs` | Per-user Run key (no admin) |
 | `AppSettings.cs` | `%LOCALAPPDATA%\TaskSync\settings.json`, off-screen recovery |
+
+## Desktop without an installer (Edge app + pop-out widget)
+
+Omnifi PCs block unsigned executables (Defender ASR "prevalence, age, or trusted list" rule), so the default desktop
+experience needs no `.exe`:
+- **Installable web app:** `web/public/manifest.webmanifest` + icons. Edge installs TaskSync as an app (own window,
+  Start menu, taskbar badge via `navigator.setAppBadge`, Windows notifications through Edge, start on login via
+  `edge://apps`).
+- **Pop-out widget:** `web/src/lib/pip.tsx` opens an always-on-top window with the Document Picture-in-Picture API
+  (Edge 116+) and renders the same `WidgetPage` into it with a second React root. Both roots share one store,
+  realtime connection and sign-in. Task details open in the main window.
+- Screen-capture exclusion and Win+D handling need native Win32 calls, so they exist only in the native app.
 
 ## Teams integration
 

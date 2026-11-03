@@ -53,7 +53,7 @@ IT can do (Supabase project, Entra app registration, Render settings). All three
 **Teams**
 - PNG task card (or summary of shared open tasks) → clipboard → one-to-one Teams chat deep link with prefilled message
 
-**Tests and docs**: see [TEST_REPORT.md](TEST_REPORT.md) (135 automated tests across 6 suites, all passing), README,
+**Tests and docs**: see [TEST_REPORT.md](TEST_REPORT.md) (142 automated tests across 6 suites, all passing), README,
 ARCHITECTURE, SECURITY, DEPLOYMENT_GUIDE, `.env.example`.
 
 ## In progress
@@ -67,7 +67,8 @@ ARCHITECTURE, SECURITY, DEPLOYMENT_GUIDE, `.env.example`.
 | Live deployment verification | After Render env vars are set (Blocked) |
 | Real Entra sign-in tests (approved / personal / other tenant) | After app registration (Blocked) |
 | Manual desktop checks | Win+D, peek, tray menu, toast look, Teams paste, live screen share (TEST_REPORT "Not tested") |
-| Desktop installer / IT packaging | MSIX or Intune Win32 package; signing or allowlisting by IT |
+| Native desktop app rollout | Only if IT agrees to trust/sign it; until then the Edge app is the desktop experience |
+| Email one-time-code sign-in | Fallback if the tenant blocks app registration or user consent (not needed if §2 works) |
 | Directory sync from Microsoft Graph | Job title/department from Entra (`User.Read.All`, admin consent). Today profiles are self-edited |
 | Automatic Teams message sending | Needs Graph `ChatMessage.Send` + admin consent. Deliberately out of the MVP |
 | Pagination beyond 200 tasks per list / 100 activity items | Lists are capped; "load older" exists for activity only |
@@ -79,8 +80,12 @@ ARCHITECTURE, SECURITY, DEPLOYMENT_GUIDE, `.env.example`.
 
 - **Render free cold start:** the first request after ~15 minutes idle takes about a minute. The UI says so and retries.
 - **Supabase free pause:** projects pause after 7 days without activity. Restore from the dashboard.
-- **Unsigned desktop executable** is blocked by Omnifi's application-control policy on at least this PC. It needs
-  IT allowlisting or signing (no workaround is provided).
+- **Native desktop executable** is blocked by Omnifi's Defender ASR rule (prevalence/age/trusted list). The
+  default desktop experience is therefore the **Edge app + pop-out widget** (no installer). Screen-share hiding and
+  Win+D behaviour exist only in the native app, which needs IT to trust or sign it.
+- **Pop-out widget** closes when the main TaskSync window is closed (browser rule). Its behaviour on Win+D isn't verified.
+- **No-admin sign-in** depends on the tenant allowing users to register apps and to consent to basic sign-in
+  (Microsoft defaults). If Omnifi has turned those off, TaskSync needs the email-code fallback (not built yet).
 - Development sign-in sessions reset whenever the local server restarts (dev-only key, by design).
 - Screen-capture exclusion needs Windows 10 2004 or later. Older builds show a black box in captures instead.
 - Single API instance assumed (in-memory rate limits and realtime fan-out). Fine on Render Free.
@@ -88,15 +93,15 @@ ARCHITECTURE, SECURITY, DEPLOYMENT_GUIDE, `.env.example`.
 ## Blockers
 
 1. **Supabase project**: needs your Supabase sign-up (no card). DEPLOYMENT_GUIDE §1.
-2. **Entra ID app registration + admin consent**: needs an Entra admin (likely Omnifi IT). DEPLOYMENT_GUIDE §2.
+2. **Entra ID app registration**: you can create it yourself (no admin consent needed). DEPLOYMENT_GUIDE §2.
 3. **Render service settings**: needs access to the Render dashboard. DEPLOYMENT_GUIDE §4.
 
 ## Required actions from you
 
 1. Make the GitHub repository private (DEPLOYMENT_GUIDE §0).
 2. Create the Supabase project and copy the session-pooler URL and CA certificate (§1).
-3. Ask IT to create the Entra app registration exactly as in §2 and send you the tenant ID and client ID.
+3. Register the TaskSync app in Entra yourself (§2) and put the tenant ID and client ID into Render.
 4. In Render, set the build/start commands, health check and environment variables (§4), then deploy.
 5. Sign in at <https://tasksync-vgam.onrender.com> as the bootstrap admin and approve colleagues.
-6. Ask IT how they want to distribute `TaskSync.exe` (allowlist or signing via Intune) (§6).
+6. Install TaskSync as an Edge app and try **Pop out widget** (§6). Ask colleagues to do the same.
 7. Do the ~1-minute manual desktop checks in TEST_REPORT.md.

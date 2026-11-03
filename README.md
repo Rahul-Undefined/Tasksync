@@ -12,10 +12,13 @@ Windows widget, across everyone's computers.
   and an activity log.
 - **Real-time:** WebSocket push, replay of anything missed while offline, an offline outbox, and an automatic
   HTTP fallback when a corporate proxy blocks WebSockets.
-- **Access:** Microsoft Entra ID (single tenant), validated on the server, `@myomnifi.com` only, plus admin approval
-  for every new employee.
-- **Windows companion:** a floating, resizable widget (C#/.NET 8 + WebView2) with tray icon, Windows notifications,
-  always-on-top, start with Windows, **hidden from screen sharing**, and **stays put on Win+D / desktop peek**.
+- **Access:** Microsoft Entra ID (single tenant) with **no IT admin consent needed**, validated on the server,
+  `@myomnifi.com` only, plus TaskSync's own approval for every new employee.
+- **Windows desktop, no installer:** install TaskSync as an Edge app (own window, taskbar badge, notifications,
+  start with Windows) and **pop out** a live always-on-top widget.
+- **Native Windows companion (optional, needs IT):** C#/.NET 8 + WebView2 widget with tray icon, **hidden from
+  screen sharing**, and **stays put on Win+D / desktop peek**. Omnifi's Defender policy blocks unsigned apps, so
+  it's only for when IT trusts it.
 - **Teams:** click any employee's name, choose *Message in Teams*, and TaskSync copies a PNG task card to your
   clipboard and opens your one-to-one chat with them. You paste and send.
 - **Dark Liquid Glass UI:** translucent layered panels, blue-violet accents, Windows 11 typography, responsive down

@@ -10,11 +10,11 @@ Microsoft accounts yet, because the Entra app registration and Supabase project 
 
 | Suite | Command | Result |
 |---|---|---|
-| API integration: auth, onboarding, task workflow, permissions, realtime, hardening (in-memory PostgreSQL / PGlite) | `npm test -w server` | **60 passed / 0 failed** |
-| Same 60 tests against a **real PostgreSQL 18 server** (concurrent connections, row locks) | `npm run test:pg` | **60 passed / 0 failed** |
-| Web unit: realtime client (dedupe, backoff, 4401/4403, resync, HTTP fallback), list rules, mentions, Teams links | `npm test -w web` | **18 passed / 0 failed** |
+| API integration: auth (incl. no-admin ID-token sign-in), onboarding, task workflow, permissions, realtime, hardening (in-memory PostgreSQL / PGlite) | `npm test -w server` | **64 passed / 0 failed** |
+| Same 64 tests against a **real PostgreSQL 18 server** (concurrent connections, row locks) | `npm run test:pg` | **64 passed / 0 failed** |
+| Web unit: realtime client (dedupe, backoff, 4401/4403, resync, HTTP fallback), ID-token refresh timing, list rules, mentions, Teams links | `npm test -w web` | **20 passed / 0 failed** |
 | Desktop unit: settings, off-screen recovery, auto-start (throwaway registry key), URL allowlists, bridge validation, real clipboard | `npm run test:desktop` | **42 passed / 0 failed** |
-| Web E2E in **Microsoft Edge**, two separate user profiles | `npm run test:e2e` | **6 passed / 0 failed** |
+| Web E2E in **Microsoft Edge**, two separate user profiles (incl. installable-app manifest and pop-out widget) | `npm run test:e2e` | **7 passed / 0 failed** |
 | Desktop E2E: real WinForms + WebView2 app, driven over CDP, Windows effects checked | `npm run test:e2e:desktop` | **9 passed / 0 failed** |
 | Dependency audit | `npm audit` | **0 vulnerabilities** |
 
@@ -31,9 +31,9 @@ That session also found two UI bugs, both fixed (stale mention directory; contex
 
 | # | Requirement | Status | Evidence |
 |---|---|---|---|
-| 1 | Login with an approved company account | **Passed** (simulated Entra tokens) · real Entra: **Blocked** | `auth.test` T1; Edge E2E sign-in |
+| 1 | Login with an approved company account | **Passed** (simulated Entra tokens, both ID-token and access-token modes) · real Entra: **Blocked** | `auth.test` T1 + no-admin ID-token suite; Edge E2E sign-in |
 | 2 | Reject personal Microsoft account | **Passed** (simulated) · real: **Blocked** | `auth.test` T2: consumer tenant id and MSA guest (`idp=live.com`) |
-| 3 | Reject external tenant | **Passed** (simulated) · real: **Blocked** | `auth.test` T3: other tid, forged issuer/tid mix, guests (`acct=1`, `#EXT#`) |
+| 3 | Reject external tenant | **Passed** (simulated) · real: **Blocked** | `auth.test` T3: other tid, forged issuer/tid mix, guests (`acct=1`, `#EXT#`); ID tokens for other apps, v1 issuer and app-only tokens rejected |
 | 4 | Reject unapproved employee | **Passed** | `auth.test` T4 (all data routes 403); Edge E2E "waits for approval"; WebSocket refuses pending users |
 | 5 | Employee approval workflow | **Passed** | `auth.test` T5 (approve/reject/deactivate/reactivate, history, audit, last-admin guard); Edge E2E live approval |
 | 6 | Self-assignment | **Passed** | `tasks.test` T6: creator = assignee, My Tasks, `self_assigned` history |
@@ -49,7 +49,7 @@ That session also found two UI bugs, both fixed (stale mention directory; contex
 | 16 | Concurrent updates | **Passed** | `tasks.test` T16 on **real PostgreSQL**: version conflict 409, complete-vs-cancel race, 5 simultaneous completions → 1 record |
 | 17 | Offline and reconnect | **Passed** | `realtime.test` T17 (exact replay, no duplicates, resync after prune, HTTP replay); Edge E2E offline outbox (created exactly once); desktop offline page + automatic recovery |
 | 18 | Permission boundaries | **Passed** | `tasks.test` T18 (404 for non-participants on 7 routes, creator-only edits, shared-only employee view, directory hides pending); `auth.test` admin-only routes, spoofed role claims; Edge E2E live revocation |
-| 19 | Desktop widget behaviour | **Passed** (automated parts) · **Not tested**: see below | Desktop E2E ×9 + unit ×42: load/sign-in, always-on-top (real `TopMost`), compact/expanded resize, live tasks, toast, minimise to tray, restart keeps size/mode/pin/sign-in, offline retry page, **hidden from screen capture** (affinity `0x11` + capture comparison), **minimise guard** (external `SW_MINIMIZE` / `SC_MINIMIZE`), auto-start registry |
+| 19 | Desktop widget behaviour | **Passed** (automated parts) · **Not tested**: see below | No-install path: Edge E2E opens the pop-out widget in real Edge and sees a colleague's new task arrive in it live; manifest/icons served. Native app: desktop E2E ×9 + unit ×42: load/sign-in, always-on-top (real `TopMost`), compact/expanded resize, live tasks, toast, minimise to tray, restart keeps size/mode/pin/sign-in, offline retry page, **hidden from screen capture** (affinity `0x11` + capture comparison), **minimise guard** (external `SW_MINIMIZE` / `SC_MINIMIZE`), auto-start registry |
 | 20 | Teams link and clipboard workflow | **Passed** (automated parts) · **Not tested**: paste into real Teams | Edge E2E: PNG on clipboard (signature checked, >20 KB) + correct `teams.microsoft.com/l/chat/0/0?users=…&message=…`; desktop E2E: Windows clipboard has image (PNG + bitmap) + `msteams:/l/chat/…` launch request; unit: link encoding, injection rejected |
 
 ### Not tested (and why)
@@ -62,7 +62,7 @@ That session also found two UI bugs, both fixed (stale mention directory; contex
 | Start with Windows on an actual sign-in | Tests use a throwaway registry key; the real Run key was never touched | Enable it in Settings, sign out/in to Windows |
 | Pasting the copied image into Teams and sending | Would message a real person | Use *Message in Teams* on yourself or a colleague, then Ctrl+V |
 | Screen share in Teams/Zoom (visual) | Capture exclusion was verified with Windows' capture API, not in a live meeting | Share your screen in a test meeting; the widget shouldn't appear |
-| Running unsigned `TaskSync.exe` directly | Company application-control policy blocks unsigned executables on this PC ("Access is denied"). The E2E launches the same build with `dotnet TaskSync.dll`. | After IT allowlists or signs it (DEPLOYMENT_GUIDE §6) |
+| Running unsigned `TaskSync.exe` directly | Microsoft Defender ASR rule *Block executable files unless they meet a prevalence, age, or trusted list criterion* (block mode, company-managed) refuses it: Defender event 1121 for `TaskSync.exe`. The desktop E2E falls back to starting the same build through the signed `dotnet` host on this developer PC. That's a test harness only, not a distribution route. | Only if IT trusts or signs it (DEPLOYMENT_GUIDE §6). The default desktop experience is the Edge app |
 
 ### Blocked (external configuration needed)
 

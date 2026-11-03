@@ -10,7 +10,7 @@ still open. Report security problems privately to the TaskSync administrators, n
 | Someone outside Omnifi signs in | Single-tenant Entra app; server verifies signature, issuer and **exact tenant id** on every request; personal (MSA) tenant rejected |
 | Guests / B2B / personal accounts invited into the tenant | Rejected via `acct=1`, `idp` claim and `#EXT#` UPN checks (configurable `ALLOW_GUEST_ACCOUNTS`, default off) |
 | Ex-employees or not-yet-approved staff | Admin approval before any access; deactivation is immediate (API checks status per request and live WebSockets are closed with code 4403); recommended Entra "assignment required" |
-| Forged or replayed tokens | RS256 only, Microsoft JWKS for the tenant, audience = this API, scope `access_as_user`, expiry with 60 s skew; `alg:none`, wrong key, wrong audience and expired tokens are covered by tests |
+| Forged or replayed tokens | RS256 only, Microsoft JWKS for the tenant, audience = this app (ID token) or this API with scope `access_as_user` (access token), v2 issuer for ID tokens, no `azp`/`appid`/app-only tokens, expiry with 60 s skew; `alg:none`, wrong key, wrong audience, other apps' ID tokens, v1 ID tokens, app-only tokens and expired tokens are covered by tests |
 | Email-domain spoofing | Exact domain match (`evilmyomnifi.com`, `myomnifi.com.evil.com`, subdomains rejected). The domain is never the only check |
 | Reading or changing other people's tasks (IDOR) | Every task route loads the task and checks participation/role server-side; unknown and forbidden ids both return 404 |
 | Privilege escalation | Roles come only from the database; role/`createdBy`/status fields sent by clients are ignored; only admins change roles; the last admin can't be removed |
@@ -59,7 +59,13 @@ Admins can view the latest entries under **Admin → Audit log**.
 4. **Rate limits are in memory** per instance. That's fine for a single free instance, but needs a shared store if
    TaskSync ever runs more than one.
 5. **Supabase TLS verification** needs `DATABASE_CA_CERT`. `DATABASE_SSL=no-verify` is only a temporary fallback.
-6. **Desktop binary signing.** Distribute through IT (allowlist or sign); see DEPLOYMENT_GUIDE §6.
+6. **Desktop binary.** Omnifi's Defender ASR rule blocks the unsigned native app. Use the Edge app (no installer)
+   unless IT trusts or signs `TaskSync.exe`; see DEPLOYMENT_GUIDE §6. Never work around the rule.
+9. **No-admin sign-in mode** (`ENTRA_TOKEN_MODE=id`) uses ID tokens as API credentials. They're bound to this
+   app's client ID and tenant and validated in full, but they're bearer tokens like any other, so a stolen token works
+   until it expires (≈1 h). Switch to access-token mode if an admin ever exposes the API.
+10. **Shadow IT.** Supabase, Render and the GitHub repo are set up without IT review. Keep task text free of client
+    confidential data, use accounts that more than one person can recover, and tell IT when the tool grows.
 7. **Data retention.** Realtime events are pruned after 72 h. Tasks, activity, notifications and the audit log are
    kept indefinitely. Agree a retention policy with Omnifi before the database approaches the 500 MB free limit.
 8. Screen-capture exclusion stops screen sharing and screenshots on the same PC. It can't stop someone
