@@ -133,14 +133,19 @@ admin approves them under **Admin → Access requests**.
 Open <https://dashboard.render.com> → the service behind `tasksync-vgam.onrender.com`.
 
 ### 4.1 Check the repository connection
+The existing `tasksync-vgam` service uses Render's **Docker** runtime. It builds the `Dockerfile` at the root of
+the repo, so there are **no build or start commands to enter**.
+
 **Settings → Build & Deploy**:
 - Repository: `Rahul-Undefined/Tasksync`, Branch: `main`. If it points anywhere else, stop and check before changing it.
 - Root Directory: *(empty)*
-- Runtime: **Node**
-- **Build Command:** `npm ci --include=dev && npm run build`
-- **Start Command:** `npm start`
+- Dockerfile Path: `./Dockerfile` (the default). Docker Build Context Directory: `.` (the default).
+- Docker Command: *(empty)*. The Dockerfile already starts the server.
 - **Auto-Deploy:** On commit (optional)
 - Instance type must stay **Free**. Do not pick a paid instance.
+
+(If you ever create a new **Node** service instead, use build command `npm ci --include=dev && npm run build` and
+start command `npm start`. A new service gets a different `onrender.com` URL.)
 
 ### 4.2 Health check
 **Settings → Health Check Path:** `/api/health`
@@ -150,8 +155,6 @@ Open <https://dashboard.render.com> → the service behind `tasksync-vgam.onrend
 
 | Key | Value |
 |---|---|
-| `NODE_ENV` | `production` |
-| `NODE_VERSION` | `22` |
 | `DATABASE_URL` | Session-pooler URI from step 1.4 |
 | `DATABASE_CA_CERT` | Contents of the certificate from step 1.5 (see note) |
 | `ENTRA_TENANT_ID` | Directory (tenant) ID from step 2.1 |
@@ -167,12 +170,14 @@ If the field only takes one line, replace each line break with the two character
 back. If you can't get the certificate, you can temporarily set `DATABASE_SSL=no-verify`. The connection stays
 encrypted, but the server's identity isn't verified, so fix this properly later.
 
+`NODE_ENV=production` and `PORT` are already handled by the Dockerfile and Render; don't add them.
 **Never** set `DEV_AUTH` on Render. The server refuses to start in production if you do.
 
 ### 4.4 Deploy and verify
 1. **Manual Deploy → Deploy latest commit** (or push to `main`).
-2. Watch **Logs**. You should see `[migrate] applied 001_core_schema, 002_lock_down_data_api` on the first boot,
-   then `Server listening`.
+2. Watch **Logs**. The first Docker build takes about 3–6 minutes. With the database configured, the first boot
+   shows `[migrate] applied 001_core_schema, 002_lock_down_data_api`, then `Server listening`. Before the
+   variables are set, it instead shows two `[startup] … not set` warnings and still starts.
 3. Open <https://tasksync-vgam.onrender.com/api/health>. Expected:
    `{"status":"ok","database":"ok","auth":"entra",...}`.
    - `"database":"not_configured"` → `DATABASE_URL` is missing.

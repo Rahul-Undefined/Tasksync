@@ -33,6 +33,7 @@ web/       Dashboard and widget UI: React + TypeScript + Vite, MSAL sign-in
 desktop/   Windows companion: C#/.NET 8 WinForms + WebView2 (+ xUnit tests)
 e2e/       End-to-end tests: Microsoft Edge (two users) and the real desktop app
 scripts/   Dev runner, build guard, icon generator
+Dockerfile Production image built by the Render service (Docker runtime)
 ```
 
 ## Run it locally (no cloud accounts needed)
