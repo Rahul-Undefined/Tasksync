@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -152,10 +153,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webDistDir: e.WEB_DIST_DIR ?? path.resolve(here, '../../web/dist'),
     devAuth: e.DEV_AUTH,
     realtimeRetentionHours: e.REALTIME_RETENTION_HOURS,
-    version: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.npm_package_version ?? 'dev',
+    version: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.npm_package_version ?? packageVersion(),
   };
 }
 
 export function isEntraConfigured(config: AppConfig): boolean {
   return Boolean(config.entra.tenantId && config.entra.clientId);
+}
+
+/** Version from the root package.json (used when the server is started without npm, e.g. in Docker). */
+function packageVersion(): string {
+  try {
+    return (JSON.parse(readFileSync(path.resolve(here, '../../package.json'), 'utf8')) as { version?: string }).version ?? 'dev';
+  } catch {
+    return 'dev';
+  }
 }

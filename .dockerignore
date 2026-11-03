@@ -1,0 +1,15 @@
+# Keep the Docker build context small and free of local state or secrets.
+.git
+**/node_modules
+**/dist
+.data
+.env
+.env.*
+!.env.example
+.claude
+desktop
+e2e
+coverage
+test-results
+playwright-report
+*.log
