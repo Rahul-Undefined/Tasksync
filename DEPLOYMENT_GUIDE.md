@@ -6,37 +6,61 @@ payment details, stop: you are on a paid path.
 
 | Piece | Service | Cost |
 |---|---|---|
-| Web dashboard + API | Render **Free** web service (existing `tasksync-vgam`) | ₹0 |
-| Database | Supabase **Free** PostgreSQL | ₹0 |
-| Sign-in | Microsoft Entra ID app registration you create yourself (no admin consent) | ₹0 |
+| Web dashboard + API | Render **Free** web service (existing `tasksync-vgam`, Docker) | ₹0 |
+| Data storage | A **private GitHub repository**: encrypted snapshots written by TaskSync | ₹0 |
+| Sign-in | Your company Microsoft login (an Entra app registration you create yourself, no admin) | ₹0 |
 | Source code | GitHub `Rahul-Undefined/Tasksync` | ₹0 |
 | Desktop | TaskSync installed as a Microsoft Edge app + pop-out widget (no installer) | ₹0 |
 
+**Only GitHub and Render accounts are needed.** No database service. TaskSync keeps its database in the server's
+memory, saves an encrypted snapshot to your private `tasksync-data` repository a few seconds after every change
+(and when Render puts the server to sleep), keeps 7 daily backups there, and restores the latest snapshot on every
+start. If the server crashes outright (not a normal sleep or restart), the last few seconds of changes can be lost.
+
 > **No IT admin is needed** for any step below, assuming Omnifi's tenant keeps Microsoft's default settings
 > (users may register apps and consent to basic sign-in). If a step shows an error saying an administrator is
-> required, stop and send the exact message. There are fallbacks, but they should be chosen deliberately.
+> required, stop and send the exact message.
 
-## ⚡ Quick setup: 3 values, about 15 minutes
+## ⚡ Quick setup: about 15 minutes
 
-Everything else (tenant ID, database certificate, site URL) TaskSync works out by itself.
+**A. GitHub: a private data repository** (2 min)
+1. <https://github.com/new> → Repository name `tasksync-data` → **Private** → **Create repository**.
 
-| # | Where | What to copy | Render variable |
-|---|---|---|---|
-| 1 | **Supabase** → your project → green **Connect** button → *Connection string*, Method **Session pooler** | The `postgresql://postgres.…` line, with `[YOUR-PASSWORD]` replaced by your database password | `DATABASE_URL` |
-| 2 | **entra.microsoft.com** → App registrations → **New registration**: name `TaskSync`, *single tenant*, platform **Single-page application**, redirect `https://tasksync-vgam.onrender.com/` → Register | **Application (client) ID** from the Overview page | `ENTRA_CLIENT_ID` |
-| 3 | You | Your work email, e.g. `rahul@myomnifi.com` | `BOOTSTRAP_ADMIN_EMAILS` |
+**B. GitHub: a token that can only touch that repository** (3 min)
+1. <https://github.com/settings/personal-access-tokens/new> (Settings → Developer settings → Personal access
+   tokens → **Fine-grained tokens** → Generate new token).
+2. Token name `TaskSync data`. Expiration: the longest offered (e.g. 1 year). Put a reminder in your calendar.
+3. **Repository access → Only select repositories → `tasksync-data`**.
+4. **Permissions → Repository permissions → Contents → Read and write**. Leave everything else as is.
+5. **Generate token** and copy it (starts with `github_pat_`). GitHub shows it only once.
 
-Then in **Render → your service → Environment**, add those 3 variables and click **Save, rebuild, and deploy**.
-After about 5 minutes, open the site and **Sign in with Microsoft**. You're the admin; approve colleagues under **Admin**.
+**C. An encryption passphrase** (1 min)
+Make up a long secret sentence (at least 16 characters) and save it in your password manager.
+**Without it the saved data can't be read, not even by you.**
+
+**D. Microsoft sign-in** (3 min)
+<https://entra.microsoft.com> → App registrations → **New registration**: name `TaskSync`, *single tenant*,
+platform **Single-page application**, redirect `https://tasksync-vgam.onrender.com/` → **Register** → copy the
+**Application (client) ID**.
+
+**E. Render** → your service → **Environment** → add these 4 → **Save, rebuild, and deploy**:
+
+| Key | Value |
+|---|---|
+| `GITHUB_DATA_TOKEN` | the token from B |
+| `DATA_ENCRYPTION_KEY` | the passphrase from C |
+| `ENTRA_CLIENT_ID` | the client ID from D |
+| `BOOTSTRAP_ADMIN_EMAILS` | your work email, e.g. `rahul@myomnifi.com` |
+
+The data repository is found automatically (`<your GitHub name>/tasksync-data`); set `GITHUB_DATA_REPO` only if
+you named it differently. After about 5 minutes open the site → **Sign in with Microsoft** → you're the admin.
 
 The sections below explain each step in detail, plus optional hardening.
 
-> **Order matters.** Do steps 1–3 first. Render (step 4) needs the values they produce.
-
 > **Company data:** because IT hasn't reviewed these services, keep task text to internal coordination ("send
 > the March MIS to the client"). Don't paste client confidential data such as account numbers, statements or
-> passwords into tasks or comments. Sign up for Supabase and Render with an email you'll keep, and add a
-> trusted colleague as a second owner, so TaskSync doesn't depend on one person.
+> passwords into tasks or comments. Add a trusted colleague as a second owner of the Entra app and the GitHub
+> repositories, so TaskSync doesn't depend on one person.
 
 ---
 
@@ -52,31 +76,30 @@ company software.
 
 ---
 
-## 1. Create the database (Supabase Free, about 10 minutes)
+## 1. Data storage: a private GitHub repository (about 5 minutes)
 
-1. Go to <https://supabase.com> → **Start your project** → sign in (GitHub sign-in is fine).
-2. **New project**
-   - Organisation: create one on the **Free** plan.
-   - Name: `tasksync`
-   - Database password: click **Generate a password** and store it in your password manager.
-   - Region: **South Asia (Mumbai)**, the closest to Omnifi users.
-3. Wait until the project shows **Healthy** (1–2 minutes).
-4. Click **Connect** (top of the project page) → **Connection string** → choose **Session pooler**.
-   Copy the URI. It looks like
-   `postgresql://postgres.abcdefgh:[YOUR-PASSWORD]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres`.
-   Replace `[YOUR-PASSWORD]` with the password from step 2. This is your **`DATABASE_URL`**.
-   - Use the *Session pooler*, not *Direct connection*. The direct address is IPv6-only and Render can't reach it.
-5. **Database certificate: nothing to do.** TaskSync ships Supabase's public root certificate and verifies the
-   connection with it automatically. (`DATABASE_CA_CERT` is only for a non-Supabase database with a private CA.)
-6. Optional, recommended: **Settings → Data API**: turn **off** "Enable Data API". TaskSync never uses Supabase's
-   public REST API. The tables are already locked (row level security on, no public grants), and this closes the door completely.
+Steps A–C of the quick setup. Details:
+- **Why a private repo?** Render's free plan has no permanent disk (files vanish on restart) and its free
+  database is deleted after 30 days, so TaskSync stores its data in GitHub instead. Each save is one small
+  commit that replaces the previous one (no growing history), with `tasksync-snapshot.bin` (latest) and
+  `backups/YYYY-MM-DD.bin` (last 7 days).
+- **Encryption:** snapshots are AES-256-GCM encrypted with a key derived from `DATA_ENCRYPTION_KEY` before they
+  leave the server. The repository only ever contains ciphertext. Keep the passphrase safe; changing it later
+  needs an export/import.
+- **Safety:** on start TaskSync loads the latest snapshot **before** serving anyone. If GitHub can't be read
+  (wrong token, outage), it serves nothing, keeps retrying, and never overwrites the stored data with an empty
+  database. `/api/health` shows `"storage"` with the last save time and any error.
+- **Token:** fine-grained, limited to the `tasksync-data` repository, *Contents: Read and write* only. It can't
+  touch your code repository. When it expires, saving fails (shown in `/api/health`; data stays in memory until
+  restart), so create a new token and update `GITHUB_DATA_TOKEN` before that date.
+- **Limits:** built for one Render instance (the free plan runs one). GitHub's API allows 5,000 requests an hour;
+  TaskSync uses about 6 per save and batches changes, which is far below that for a team.
 
-You do **not** need to create tables. TaskSync creates and upgrades its own schema on startup (migrations).
-
-Free-tier limits to know about:
-- 500 MB of database storage, which is plenty for years of tasks.
-- **A free project pauses after 7 days with no activity.** Normal daily use keeps it awake. If it pauses, open the
-  Supabase dashboard and click **Restore project**.
+### Alternative: a PostgreSQL database (optional)
+If you ever get a PostgreSQL database (e.g. Supabase Free or a paid host), set `DATABASE_URL` instead of the
+GitHub variables. TaskSync then uses that database directly. For Supabase, copy the **Session pooler**
+connection string from the project's **Connect** button; Supabase's certificate is built in.
+If you created a Supabase project earlier and don't need it, you can delete it (Project Settings → General).
 
 ---
 
@@ -174,11 +197,14 @@ start command `npm start`. A new service gets a different `onrender.com` URL.)
 
 | Key | Value |
 |---|---|
-| `DATABASE_URL` | Session-pooler URI from step 1.4 |
+| `GITHUB_DATA_TOKEN` | Fine-grained token for the `tasksync-data` repository (step 1) |
+| `DATA_ENCRYPTION_KEY` | Your passphrase, at least 16 characters (step 1) |
 | `ENTRA_CLIENT_ID` | Application (client) ID from step 2.1 |
 | `BOOTSTRAP_ADMIN_EMAILS` | e.g. `rahul@myomnifi.com` |
 
-**Optional** (defaults are fine): `ALLOWED_EMAIL_DOMAINS` (default `myomnifi.com`), `ENTRA_TENANT_ID`
+(Or `DATABASE_URL` instead of the two GitHub variables if you use a PostgreSQL database.)
+
+**Optional** (defaults are fine): `GITHUB_DATA_REPO` (default `<owner>/tasksync-data`), `ALLOWED_EMAIL_DOMAINS` (default `myomnifi.com`), `ENTRA_TENANT_ID`
 (auto-discovered), `PUBLIC_BASE_URL` (defaults to Render's URL), `DATABASE_CA_CERT` (Supabase's CA is built in),
 `ENTRA_TOKEN_MODE` (default `id`, the no-admin mode; see 2.6), `RATE_LIMIT_PER_MINUTE` (default 300).
 **Settings → Health Check Path** `/api/health` is recommended but optional.
@@ -188,13 +214,14 @@ start command `npm start`. A new service gets a different `onrender.com` URL.)
 
 ### 4.4 Deploy and verify
 1. **Manual Deploy → Deploy latest commit** (or push to `main`).
-2. Watch **Logs**. The first Docker build takes about 3–6 minutes. With the database configured, the first boot
-   shows `[migrate] applied 001_core_schema, 002_lock_down_data_api`, then `Server listening`. Before the
-   variables are set, it instead shows two `[startup] … not set` warnings and still starts.
+2. Watch **Logs**. The first Docker build takes about 3–6 minutes. With GitHub storage you should see
+   `[storage] using encrypted snapshots in github:…/tasksync-data` and then either `no snapshot … yet` (first run)
+   or `loaded snapshot …`. Before the variables are set, it shows `[startup] … not set` warnings and still starts.
 3. Open <https://tasksync-vgam.onrender.com/api/health>. Expected:
    `{"status":"ok","database":"ok","auth":"entra",...}`.
-   - `"database":"not_configured"` → `DATABASE_URL` is missing.
-   - `"database":"error"` → wrong password or pooler URL. Check the Render logs.
+   - `"database":"not_configured"` → the storage variables are missing; `"storage"` says which.
+   - `"database":"loading"` → it's restoring the snapshot; give it a few seconds.
+   - `"database":"error"` → GitHub couldn't be read (token, repo name, expiry). `"storage"."lastError"` says why.
    - `"auth":"not_configured"` → `ENTRA_CLIENT_ID` is missing, or the tenant lookup failed (see the log line
      `[startup] Microsoft Entra tenant for …`).
 4. Open <https://tasksync-vgam.onrender.com>, click **Sign in with Microsoft**, and use your bootstrap admin
@@ -277,4 +304,5 @@ against Supabase or Entra locally, copy `.env.example` to `.env` and fill it in.
 | "Your access request is waiting…" forever | An admin must approve you; check `BOOTSTRAP_ADMIN_EMAILS` for the first admin. |
 | Status pill shows **Live (HTTP fallback)** | Your network blocks WebSockets. Updates still arrive every 15 seconds. Ask IT to allow WebSockets to `tasksync-vgam.onrender.com` for instant updates. |
 | `self-signed certificate in certificate chain` in Render logs | Only for non-Supabase databases: set `DATABASE_CA_CERT`. |
-| Supabase project paused | Supabase dashboard → Restore project. |
+| `/api/health` storage error mentions `GITHUB_DATA_TOKEN` | Token expired or lacks *Contents: Read and write* on `tasksync-data`; create a new one and update Render. |
+| `Snapshot could not be decrypted` | `DATA_ENCRYPTION_KEY` in Render isn't the one used to save the data. Put the original back. |

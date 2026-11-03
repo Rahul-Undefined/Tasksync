@@ -53,7 +53,7 @@ IT can do (Supabase project, Entra app registration, Render settings). All three
 **Teams**
 - PNG task card (or summary of shared open tasks) → clipboard → one-to-one Teams chat deep link with prefilled message
 
-**Tests and docs**: see [TEST_REPORT.md](TEST_REPORT.md) (142 automated tests across 6 suites, all passing), README,
+**Tests and docs**: see [TEST_REPORT.md](TEST_REPORT.md) (154 automated tests across 6 suites, all passing), README,
 ARCHITECTURE, SECURITY, DEPLOYMENT_GUIDE, `.env.example`.
 
 ## In progress
@@ -78,6 +78,10 @@ ARCHITECTURE, SECURITY, DEPLOYMENT_GUIDE, `.env.example`.
 
 ## Known issues and limitations
 
+- **GitHub storage durability:** changes are saved a few seconds after they happen and on shutdown. A hard crash
+  can lose the last few seconds. One Render instance only. The token expires (fine-grained tokens last up to a year),
+  so renew it before the date or saving stops (visible in `/api/health`).
+
 - **Render free cold start:** the first request after ~15 minutes idle takes about a minute. The UI says so and retries.
 - **Supabase free pause:** projects pause after 7 days without activity. Restore from the dashboard.
 - **Native desktop executable** is blocked by Omnifi's Defender ASR rule (prevalence/age/trusted list). The
@@ -92,16 +96,18 @@ ARCHITECTURE, SECURITY, DEPLOYMENT_GUIDE, `.env.example`.
 
 ## Blockers
 
-1. **Supabase project**: needs your Supabase sign-up (no card). DEPLOYMENT_GUIDE §1.
+1. **Data storage**: a private `tasksync-data` GitHub repository + fine-grained token + passphrase (no database
+   service needed). DEPLOYMENT_GUIDE §1.
 2. **Entra ID app registration**: you can create it yourself (no admin consent needed). DEPLOYMENT_GUIDE §2.
 3. **Render service settings**: needs access to the Render dashboard. DEPLOYMENT_GUIDE §4.
 
 ## Required actions from you
 
-0. **Quick path:** follow "Quick setup: 3 values" at the top of DEPLOYMENT_GUIDE.md (database URL, Entra client
-   ID, your email). Everything below is detail or hardening.
+0. **Quick path (GitHub + Render only):** follow "Quick setup" at the top of DEPLOYMENT_GUIDE.md: create the private
+   `tasksync-data` repo and a fine-grained token, pick an encryption passphrase, register the Entra app, then put
+   4 values in Render. Everything below is detail or hardening.
 1. Make the GitHub repository private (DEPLOYMENT_GUIDE §0).
-2. Create the Supabase project and copy the session-pooler URL and CA certificate (§1).
+2. Create the private `tasksync-data` repository, a fine-grained token for it, and an encryption passphrase (§1).
 3. Register the TaskSync app in Entra yourself (§2) and put the tenant ID and client ID into Render.
 4. In Render, set the build/start commands, health check and environment variables (§4), then deploy.
 5. Sign in at <https://tasksync-vgam.onrender.com> as the bootstrap admin and approve colleagues.

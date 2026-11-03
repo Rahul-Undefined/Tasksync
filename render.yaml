@@ -12,8 +12,10 @@ services:
     envVars:
       - key: ALLOWED_EMAIL_DOMAINS
         value: myomnifi.com
-      # Set in the Render dashboard (never commit them). Tenant ID, database CA and site URL are automatic.
-      - key: DATABASE_URL
+      # Set in the Render dashboard (never commit them). Tenant ID and site URL are automatic.
+      - key: GITHUB_DATA_TOKEN
+        sync: false
+      - key: DATA_ENCRYPTION_KEY
         sync: false
       - key: ENTRA_CLIENT_ID
         sync: false

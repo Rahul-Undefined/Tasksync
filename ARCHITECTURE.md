@@ -21,6 +21,24 @@ One Render service hosts both the API and the built React app, so the dashboard 
 surface, one URL: `https://tasksync-vgam.onrender.com`). The desktop app is a thin native shell around the same web
 UI (`/widget` route), so features ship to both at once.
 
+## Data storage without a database service
+
+Render Free has no persistent disk and its free PostgreSQL expires after 30 days, and the project only uses
+GitHub and Render. So, unless `DATABASE_URL` is set, TaskSync runs **PostgreSQL in-process (PGlite)** and makes it
+durable with **encrypted snapshots in a private GitHub repository** (`server/src/storage/`):
+
+- `snapshot.ts`: logical JSON export/import of all tables (parents before children, identity sequences and the
+  realtime event cursor carried over, new columns get defaults, all in one transaction).
+- `crypto.ts`: gzip, then AES-256-GCM with a scrypt-derived key from `DATA_ENCRYPTION_KEY` (random salt and IV per file).
+- `github.ts`: Git Data API. Each save is one parentless commit (latest + 7 daily backups) force-moved onto the
+  branch, so history doesn't grow. An empty repository is initialised automatically.
+- `persistence.ts`: loads before serving (503 `storage_loading` until then, and never saves before a successful
+  load); saves 3 s after the last change (max 15 s), retries failures, saves on SIGTERM; during the first minutes
+  it reloads if the previous instance saved newer data while shutting down (Render deploy overlap).
+
+Trade-offs: changes in the last seconds before a hard crash can be lost; one instance only; every start restores
+the snapshot (fast at team scale). With `DATABASE_URL`, the same code runs on a regular PostgreSQL server instead.
+
 ## Key decisions and trade-offs
 
 | Decision | Why | Trade-off |

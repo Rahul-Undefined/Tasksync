@@ -14,7 +14,9 @@ still open. Report security problems privately to the TaskSync administrators, n
 | Email-domain spoofing | Exact domain match (`evilmyomnifi.com`, `myomnifi.com.evil.com`, subdomains rejected). The domain is never the only check |
 | Reading or changing other people's tasks (IDOR) | Every task route loads the task and checks participation/role server-side; unknown and forbidden ids both return 404 |
 | Privilege escalation | Roles come only from the database; role/`createdBy`/status fields sent by clients are ignored; only admins change roles; the last admin can't be removed |
-| Supabase public APIs exposing tables | RLS enabled on every table and all grants revoked from `anon`/`authenticated`, re-applied on every start; recommended: turn off the Data API |
+| Data at rest on GitHub | Snapshots are AES-256-GCM encrypted (scrypt-derived key, random salt/IV, authenticated) before upload; the private repo holds only ciphertext; the token is fine-grained to that one repository with Contents read/write only, so it can't change the code repo |
+| Data loss from a misconfigured start | The server never serves or saves until the stored snapshot loaded successfully; an unreadable store means 503, not an empty database overwriting real data; 7 daily backups kept |
+| Supabase public APIs exposing tables (only if `DATABASE_URL` points at Supabase) | RLS enabled on every table and all grants revoked from `anon`/`authenticated`, re-applied on every start; recommended: turn off the Data API |
 | Service-role keys leaking | TaskSync doesn't use Supabase keys at all; the database URL lives only in Render's environment |
 | Injection | Parameterised SQL everywhere; `zod` validation and length limits on every input; LIKE wildcards escaped |
 | XSS | React escaping; strict CSP (`script-src 'self'`, no inline scripts, `frame-ancestors 'none'`); comment and mention text is never rendered as HTML |
@@ -31,7 +33,8 @@ still open. Report security problems privately to the TaskSync administrators, n
 ## Secrets
 
 - No secrets are committed. `.env` files are git-ignored; `.env.example` contains placeholders only.
-- Secrets live in Render environment variables: `DATABASE_URL` and `DATABASE_CA_CERT`.
+- Secrets live in Render environment variables: `GITHUB_DATA_TOKEN` and `DATA_ENCRYPTION_KEY` (or `DATABASE_URL`).
+  Losing `DATA_ENCRYPTION_KEY` makes the stored data unreadable, so keep a copy in a password manager.
 - Entra tenant and client IDs are **not** secrets (they appear in every sign-in URL) but are still kept in env vars.
 - The SPA uses the public-client auth code + PKCE flow. There is no client secret anywhere.
 - Test fixtures use fictional people and a fictional tenant (`example.com`), not real Omnifi data.

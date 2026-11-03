@@ -10,9 +10,9 @@ Microsoft accounts yet, because the Entra app registration and Supabase project 
 
 | Suite | Command | Result |
 |---|---|---|
-| API integration: auth (incl. no-admin ID-token sign-in), onboarding, task workflow, permissions, realtime, hardening (in-memory PostgreSQL / PGlite) | `npm test -w server` | **64 passed / 0 failed** |
-| Same 64 tests against a **real PostgreSQL 18 server** (concurrent connections, row locks) | `npm run test:pg` | **64 passed / 0 failed** |
-| Web unit: realtime client (dedupe, backoff, 4401/4403, resync, HTTP fallback), ID-token refresh timing, list rules, mentions, Teams links | `npm test -w web` | **20 passed / 0 failed** |
+| API integration: auth (incl. no-admin ID-token sign-in), onboarding, task workflow, permissions, realtime, hardening, zero-paperwork config, **GitHub snapshot storage** (encryption, exact restore, fake GitHub API incl. empty repo and bad token, restart restore, outage safety, failed-save retry, shutdown flush) (in-memory PostgreSQL / PGlite) | `npm test -w server` | **75 passed / 0 failed** |
+| Same 75 tests against a **real PostgreSQL 18 server** (concurrent connections, row locks) | `npm run test:pg` | **75 passed / 0 failed** |
+| Web unit: realtime client (dedupe, backoff, 4401/4403, resync incl. cursor going down after a restore, HTTP fallback), ID-token refresh timing, list rules, mentions, Teams links | `npm test -w web` | **21 passed / 0 failed** |
 | Desktop unit: settings, off-screen recovery, auto-start (throwaway registry key), URL allowlists, bridge validation, real clipboard | `npm run test:desktop` | **42 passed / 0 failed** |
 | Web E2E in **Microsoft Edge**, two separate user profiles (incl. installable-app manifest and pop-out widget) | `npm run test:e2e` | **7 passed / 0 failed** |
 | Desktop E2E: real WinForms + WebView2 app, driven over CDP, Windows effects checked | `npm run test:e2e:desktop` | **9 passed / 0 failed** |
@@ -69,8 +69,12 @@ That session also found two UI bugs, both fixed (stale mention directory; contex
 | Item | Needs |
 |---|---|
 | Real Microsoft sign-in (approved account, personal account, external tenant) | Entra app registration (DEPLOYMENT_GUIDE §2) |
-| Persistence on Supabase | Supabase project + `DATABASE_URL` (§1) |
+| Saving to the real GitHub API | `tasksync-data` repo + fine-grained token + `DATA_ENCRYPTION_KEY` in Render (quick setup A–C, E) |
 | Live deployment fully configured | Code **is deployed and verified** (2026-11-03, commit `8515a08`, Render Docker runtime): dashboard, manifest and icons served; HSTS/CSP headers present; dev sign-in disabled (404); data routes require sign-in (401); `/api/health` reports `degraded` because `DATABASE_URL` and the Entra IDs aren't set yet (§1, §2, §4.3) |
+
+GitHub storage was also checked with the **real built server**: a task was created, auto-saved to a
+(fake) GitHub API as an encrypted snapshot plus daily backup, the process was killed, and a fresh process restored
+it. The real GitHub API hasn't been exercised yet; that happens on the first Render start with your token.
 
 ## Bugs found by testing and fixed
 
