@@ -1,0 +1,23 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.data/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+# .NET
+desktop/**/bin/
+desktop/**/obj/
+desktop/**/publish/
+*.user
+.vs/
+# Playwright
+test-results/
+playwright-report/
+
+# Local tooling
+.claude/

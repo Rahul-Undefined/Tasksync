@@ -1,0 +1,33 @@
+{
+  "name": "tasksync",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TaskSync — internal task management for Omnifi (web dashboard, API and Windows desktop companion)",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "npm run build -w shared && npm run build -w server && npm run build -w web",
+    "start": "node server/dist/index.js",
+    "prestart": "node scripts/ensure-build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "test": "npm run build -w shared && npm run test -w server && npm run test -w web",
+    "test:pg": "npm run test:pg -w server",
+    "test:e2e": "node --test --test-reporter=spec e2e/web.e2e.mjs",
+    "test:e2e:desktop": "node --test --test-reporter=spec e2e/desktop.e2e.mjs",
+    "build:desktop": "dotnet build desktop/TaskSync.Desktop -c Release",
+    "test:desktop": "dotnet test desktop/TaskSync.Desktop.Tests",
+    "publish:desktop": "dotnet publish desktop/TaskSync.Desktop -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o desktop/publish/TaskSync",
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web",
+    "audit:deps": "npm audit --omit=dev"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}
