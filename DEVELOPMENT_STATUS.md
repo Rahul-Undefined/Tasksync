@@ -98,6 +98,8 @@ ARCHITECTURE, SECURITY, DEPLOYMENT_GUIDE, `.env.example`.
 
 ## Required actions from you
 
+0. **Quick path:** follow "Quick setup: 3 values" at the top of DEPLOYMENT_GUIDE.md (database URL, Entra client
+   ID, your email). Everything below is detail or hardening.
 1. Make the GitHub repository private (DEPLOYMENT_GUIDE §0).
 2. Create the Supabase project and copy the session-pooler URL and CA certificate (§1).
 3. Register the TaskSync app in Entra yourself (§2) and put the tenant ID and client ID into Render.

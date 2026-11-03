@@ -12,14 +12,8 @@ services:
     envVars:
       - key: ALLOWED_EMAIL_DOMAINS
         value: myomnifi.com
-      - key: PUBLIC_BASE_URL
-        value: https://tasksync-vgam.onrender.com
-      # Secrets / tenant-specific values: set in the Render dashboard (never commit them).
+      # Set in the Render dashboard (never commit them). Tenant ID, database CA and site URL are automatic.
       - key: DATABASE_URL
-        sync: false
-      - key: DATABASE_CA_CERT
-        sync: false
-      - key: ENTRA_TENANT_ID
         sync: false
       - key: ENTRA_CLIENT_ID
         sync: false

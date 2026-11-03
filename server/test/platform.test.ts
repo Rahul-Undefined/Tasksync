@@ -4,7 +4,9 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { ConfigError, loadConfig } from '../src/config.js';
-import { createPgliteDatabase } from '../src/db/database.js';
+import { createPgliteDatabase, sslOptions } from '../src/db/database.js';
+import { discoverTenantId } from '../src/auth/tenant.js';
+import { X509Certificate } from 'node:crypto';
 import { runMigrations } from '../src/db/migrate.js';
 import { createTestEnv, type TestEnv } from './helpers.js';
 
@@ -37,6 +39,40 @@ describe('Configuration guards', () => {
   it('cannot build a production app with a dev identity provider', async () => {
     const config = loadConfig({ NODE_ENV: 'production' });
     await expect(buildApp({ config, db: null, devAuth: {} as never })).rejects.toThrow(/development sign-in/);
+  });
+});
+
+describe('Zero-paperwork configuration', () => {
+  it('verifies Supabase connections with the bundled Supabase root CA (no certificate to paste)', () => {
+    const ssl = sslOptions({ url: 'postgresql://postgres.abc:pw@aws-0-eu-north-1.pooler.supabase.com:5432/postgres', ssl: 'require' }) as {
+      rejectUnauthorized: boolean;
+      ca: string;
+    };
+    expect(ssl.rejectUnauthorized).toBe(true);
+    const cert = new X509Certificate(ssl.ca);
+    expect(cert.subject).toContain('CN=Supabase Root 2021 CA');
+    expect(cert.ca).toBe(true);
+    expect(cert.fingerprint256).toBe('80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA');
+    // other hosts use the system trust store; an explicit CA always wins; no-verify/disable are honoured
+    expect(sslOptions({ url: 'postgresql://u:p@db.example.com/x', ssl: 'require' })).toEqual({ rejectUnauthorized: true });
+    expect(sslOptions({ url: 'postgresql://u:p@db.x.supabase.co/x', ssl: 'require', caCert: 'PEM' })).toEqual({ rejectUnauthorized: true, ca: 'PEM' });
+    expect(sslOptions({ url: 'postgresql://u:p@h/x', ssl: 'no-verify' })).toEqual({ rejectUnauthorized: false });
+    expect(sslOptions({ url: 'postgresql://u:p@h/x', ssl: 'disable' })).toBe(false);
+  });
+
+  it('finds the Entra tenant from the company domain and rejects personal or malformed answers', async () => {
+    const fake = (issuer: unknown, ok = true) =>
+      (async () => ({ ok, json: async () => ({ issuer }) })) as unknown as typeof fetch;
+    const tid = '7a3b0c1d-2e4f-4a5b-8c6d-1e2f3a4b5c6d';
+    expect(await discoverTenantId('example.com', fake(`https://login.microsoftonline.com/${tid}/v2.0`))).toBe(tid);
+    expect(await discoverTenantId('outlook.com', fake('https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0'))).toBeNull();
+    expect(await discoverTenantId('example.com', fake('https://evil.example/abc/v2.0'))).toBeNull();
+    expect(await discoverTenantId('example.com', fake(undefined, false))).toBeNull();
+    expect(await discoverTenantId('not a domain/../x', fake(`https://login.microsoftonline.com/${tid}/v2.0`))).toBeNull();
+  });
+
+  it("uses Render's own URL when PUBLIC_BASE_URL isn't set", () => {
+    expect(loadConfig({ RENDER_EXTERNAL_URL: 'https://tasksync-vgam.onrender.com' }).publicBaseUrl).toBe('https://tasksync-vgam.onrender.com');
   });
 });
 

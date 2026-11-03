@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import pg from 'pg';
+import { isSupabaseHost, SUPABASE_ROOT_CA_2021 } from './supabase-ca.js';
 import type { AppConfig } from '../config.js';
 
 export interface QueryResult<T> {
@@ -31,14 +32,27 @@ export interface Database extends Queryable {
 // node-postgres (production: Supabase PostgreSQL)
 // ---------------------------------------------------------------------------
 
+/**
+ * TLS options for the database connection. With ssl=require the server certificate is always
+ * verified: against DATABASE_CA_CERT if given, Supabase's public root CA for Supabase hosts,
+ * or the system trust store otherwise.
+ */
+export function sslOptions(config: Pick<AppConfig['database'], 'url' | 'ssl' | 'caCert'>): pg.ClientConfig['ssl'] {
+  if (config.ssl === 'disable') return false;
+  if (config.ssl === 'no-verify') return { rejectUnauthorized: false };
+  let host = '';
+  try {
+    host = new URL(config.url ?? '').hostname;
+  } catch {
+    // unparsable URL: pg reports the problem when connecting
+  }
+  const ca = config.caCert ?? (isSupabaseHost(host) ? SUPABASE_ROOT_CA_2021 : undefined);
+  return { rejectUnauthorized: true, ...(ca ? { ca } : {}) };
+}
+
 export function createPostgresDatabase(config: AppConfig['database']): Database {
   if (!config.url) throw new Error('DATABASE_URL is not set');
-  const ssl =
-    config.ssl === 'disable'
-      ? false
-      : config.ssl === 'no-verify'
-        ? { rejectUnauthorized: false }
-        : { rejectUnauthorized: true, ...(config.caCert ? { ca: config.caCert } : {}) };
+  const ssl = sslOptions(config);
   const pool = new pg.Pool({
     connectionString: stripSslParams(config.url),
     ssl,

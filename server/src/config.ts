@@ -57,6 +57,8 @@ const envSchema = z.object({
   BOOTSTRAP_ADMIN_EMAILS: csv,
 
   PUBLIC_BASE_URL: z.string().url().optional(),
+  /** Set automatically by Render (e.g. https://tasksync-vgam.onrender.com); used when PUBLIC_BASE_URL is unset. */
+  RENDER_EXTERNAL_URL: z.string().url().optional(),
   CORS_ALLOWED_ORIGINS: csv,
   TRUST_PROXY: boolish,
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(10).default(300),
@@ -146,7 +148,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     allowedEmailDomains: domains,
     bootstrapAdminEmails: e.BOOTSTRAP_ADMIN_EMAILS.map((x) => x.toLowerCase()),
-    publicBaseUrl: e.PUBLIC_BASE_URL,
+    publicBaseUrl: e.PUBLIC_BASE_URL ?? e.RENDER_EXTERNAL_URL,
     corsOrigins: e.CORS_ALLOWED_ORIGINS,
     trustProxy: cleaned.TRUST_PROXY === undefined ? production : e.TRUST_PROXY,
     rateLimitPerMinute: e.RATE_LIMIT_PER_MINUTE,

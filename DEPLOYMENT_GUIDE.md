@@ -16,6 +16,21 @@ payment details, stop: you are on a paid path.
 > (users may register apps and consent to basic sign-in). If a step shows an error saying an administrator is
 > required, stop and send the exact message. There are fallbacks, but they should be chosen deliberately.
 
+## ⚡ Quick setup: 3 values, about 15 minutes
+
+Everything else (tenant ID, database certificate, site URL) TaskSync works out by itself.
+
+| # | Where | What to copy | Render variable |
+|---|---|---|---|
+| 1 | **Supabase** → your project → green **Connect** button → *Connection string*, Method **Session pooler** | The `postgresql://postgres.…` line, with `[YOUR-PASSWORD]` replaced by your database password | `DATABASE_URL` |
+| 2 | **entra.microsoft.com** → App registrations → **New registration**: name `TaskSync`, *single tenant*, platform **Single-page application**, redirect `https://tasksync-vgam.onrender.com/` → Register | **Application (client) ID** from the Overview page | `ENTRA_CLIENT_ID` |
+| 3 | You | Your work email, e.g. `rahul@myomnifi.com` | `BOOTSTRAP_ADMIN_EMAILS` |
+
+Then in **Render → your service → Environment**, add those 3 variables and click **Save, rebuild, and deploy**.
+After about 5 minutes, open the site and **Sign in with Microsoft**. You're the admin; approve colleagues under **Admin**.
+
+The sections below explain each step in detail, plus optional hardening.
+
 > **Order matters.** Do steps 1–3 first. Render (step 4) needs the values they produce.
 
 > **Company data:** because IT hasn't reviewed these services, keep task text to internal coordination ("send
@@ -51,8 +66,8 @@ company software.
    `postgresql://postgres.abcdefgh:[YOUR-PASSWORD]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres`.
    Replace `[YOUR-PASSWORD]` with the password from step 2. This is your **`DATABASE_URL`**.
    - Use the *Session pooler*, not *Direct connection*. The direct address is IPv6-only and Render can't reach it.
-5. **Database certificate**: Project **Settings → Database → SSL Configuration → Download certificate**.
-   Open the `.crt` file in Notepad. You'll paste it into Render as **`DATABASE_CA_CERT`** in step 4.
+5. **Database certificate: nothing to do.** TaskSync ships Supabase's public root certificate and verifies the
+   connection with it automatically. (`DATABASE_CA_CERT` is only for a non-Supabase database with a private CA.)
 6. Optional, recommended: **Settings → Data API**: turn **off** "Enable Data API". TaskSync never uses Supabase's
    public REST API. The tables are already locked (row level security on, no public grants), and this closes the door completely.
 
@@ -82,9 +97,9 @@ employee can accept it for themselves. **No "Expose an API", no "Grant admin con
 5. Redirect URI: choose platform **Single-page application (SPA)** and enter
    `https://tasksync-vgam.onrender.com/` (with the trailing slash).
 6. **Register**.
-7. On **Overview**, copy two values. Neither is a secret:
-   - **Application (client) ID** → **`ENTRA_CLIENT_ID`**
-   - **Directory (tenant) ID** → **`ENTRA_TENANT_ID`**
+7. On **Overview**, copy the **Application (client) ID** → **`ENTRA_CLIENT_ID`**. It isn't a secret.
+   The tenant ID is looked up automatically from `myomnifi.com` when the server starts (Microsoft publishes it).
+   Set `ENTRA_TENANT_ID` only if that lookup fails (the Render log says so).
 
 You are now the **owner** of this registration. Under **Owners → Add owners**, add one trusted colleague so the
 app isn't tied to a single account.
@@ -155,20 +170,18 @@ start command `npm start`. A new service gets a different `onrender.com` URL.)
 
 | Key | Value |
 |---|---|
+**Required:**
+
+| Key | Value |
+|---|---|
 | `DATABASE_URL` | Session-pooler URI from step 1.4 |
-| `DATABASE_CA_CERT` | Contents of the certificate from step 1.5 (see note) |
-| `ENTRA_TENANT_ID` | Directory (tenant) ID from step 2.1 |
 | `ENTRA_CLIENT_ID` | Application (client) ID from step 2.1 |
-| `ALLOWED_EMAIL_DOMAINS` | `myomnifi.com` |
 | `BOOTSTRAP_ADMIN_EMAILS` | e.g. `rahul@myomnifi.com` |
-| `PUBLIC_BASE_URL` | `https://tasksync-vgam.onrender.com` |
 
-Optional: `ENTRA_TOKEN_MODE` (default `id`, the no-admin mode; see 2.6), `RATE_LIMIT_PER_MINUTE` (default 300).
-
-**`DATABASE_CA_CERT` note:** paste the whole certificate including the `-----BEGIN/END CERTIFICATE-----` lines.
-If the field only takes one line, replace each line break with the two characters `\n`; TaskSync converts them
-back. If you can't get the certificate, you can temporarily set `DATABASE_SSL=no-verify`. The connection stays
-encrypted, but the server's identity isn't verified, so fix this properly later.
+**Optional** (defaults are fine): `ALLOWED_EMAIL_DOMAINS` (default `myomnifi.com`), `ENTRA_TENANT_ID`
+(auto-discovered), `PUBLIC_BASE_URL` (defaults to Render's URL), `DATABASE_CA_CERT` (Supabase's CA is built in),
+`ENTRA_TOKEN_MODE` (default `id`, the no-admin mode; see 2.6), `RATE_LIMIT_PER_MINUTE` (default 300).
+**Settings → Health Check Path** `/api/health` is recommended but optional.
 
 `NODE_ENV=production` and `PORT` are already handled by the Dockerfile and Render; don't add them.
 **Never** set `DEV_AUTH` on Render. The server refuses to start in production if you do.
@@ -181,8 +194,9 @@ encrypted, but the server's identity isn't verified, so fix this properly later.
 3. Open <https://tasksync-vgam.onrender.com/api/health>. Expected:
    `{"status":"ok","database":"ok","auth":"entra",...}`.
    - `"database":"not_configured"` → `DATABASE_URL` is missing.
-   - `"database":"error"` → wrong password, wrong pooler URL or certificate problem. Check the Render logs.
-   - `"auth":"not_configured"` → the Entra variables are missing.
+   - `"database":"error"` → wrong password or pooler URL. Check the Render logs.
+   - `"auth":"not_configured"` → `ENTRA_CLIENT_ID` is missing, or the tenant lookup failed (see the log line
+     `[startup] Microsoft Entra tenant for …`).
 4. Open <https://tasksync-vgam.onrender.com>, click **Sign in with Microsoft**, and use your bootstrap admin
    account. You should land on **My Tasks**.
 
@@ -262,5 +276,5 @@ against Supabase or Entra locally, copy `.env.example` to `.env` and fill it in.
 | Signed in but "This account does not belong to the Omnifi organisation" | You used a personal/other-tenant account; sign out and pick the work account. |
 | "Your access request is waiting…" forever | An admin must approve you; check `BOOTSTRAP_ADMIN_EMAILS` for the first admin. |
 | Status pill shows **Live (HTTP fallback)** | Your network blocks WebSockets. Updates still arrive every 15 seconds. Ask IT to allow WebSockets to `tasksync-vgam.onrender.com` for instant updates. |
-| `self-signed certificate in certificate chain` in Render logs | Set `DATABASE_CA_CERT` (step 1.5 / 4.3). |
+| `self-signed certificate in certificate chain` in Render logs | Only for non-Supabase databases: set `DATABASE_CA_CERT`. |
 | Supabase project paused | Supabase dashboard → Restore project. |
