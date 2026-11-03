@@ -20,6 +20,8 @@ interface Deps {
   db: Database | null;
   verifier: TokenVerifier | null;
   hub: RealtimeHub;
+  /** Throws (503) while stored data is still loading, so sign-in can't write into an empty database. */
+  assertReady?: () => void;
 }
 
 /** Counts failed authentications per client IP so token guessing is throttled. */
@@ -68,6 +70,7 @@ export function createAuth(deps: Deps) {
 
   async function identify(token: string, req: FastifyRequest): Promise<AuthContext> {
     if (!deps.db) throw new ApiError(503, 'not_configured', 'TaskSync database is not configured yet');
+    deps.assertReady?.();
     if (!deps.verifier) throw new ApiError(503, 'auth_not_configured', 'Microsoft sign-in is not configured yet');
     if (failures.blocked(req.ip)) throw new ApiError(429, 'too_many_failures', 'Too many failed sign-in attempts');
     let identity: VerifiedIdentity;

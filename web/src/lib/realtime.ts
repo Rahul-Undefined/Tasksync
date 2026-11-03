@@ -67,6 +67,7 @@ export class RealtimeClient {
   private lastMessageAt = 0;
   private lastAuthAt = 0;
   private forceRefresh = false;
+  private resynced = false;
   private failedAttempts = 0;
   private socketReady = false;
   private pollTimer: ReturnType<typeof setInterval> | undefined;
@@ -205,7 +206,10 @@ export class RealtimeClient {
         this.applyEvent(msg.event);
         return;
       case 'resync':
-        this.lastEventId = Math.max(this.lastEventId, msg.lastEventId);
+        // Trust the server's cursor: after a restore it can be lower than ours, and keeping
+        // ours would make us drop the new events as "duplicates".
+        this.lastEventId = msg.lastEventId;
+        this.resynced = true;
         this.opts.onResync();
         return;
       case 'ready': {
@@ -215,7 +219,8 @@ export class RealtimeClient {
         this.failedAttempts = 0;
         this.socketReady = true;
         this.stopPolling(); // WebSockets work again
-        this.lastEventId = Math.max(this.lastEventId, msg.lastEventId);
+        this.lastEventId = this.resynced ? msg.lastEventId : Math.max(this.lastEventId, msg.lastEventId);
+        this.resynced = false;
         this.setStatus('live');
         this.startHeartbeat();
         this.opts.onReady?.(reconnected);
@@ -265,7 +270,7 @@ export class RealtimeClient {
         const res = await this.opts.poll!(this.lastEventId);
         if (!this.polling) return;
         if (res.resync) {
-          this.lastEventId = Math.max(this.lastEventId, res.lastEventId);
+          this.lastEventId = res.lastEventId;
           this.opts.onResync();
         } else {
           for (const e of res.events) this.applyEvent(e);

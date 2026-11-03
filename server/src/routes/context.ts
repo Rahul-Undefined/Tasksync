@@ -3,6 +3,7 @@ import type { Database, Tx } from '../db/database.js';
 import type { Auth } from '../http/auth.js';
 import type { Outbox, RealtimeHub } from '../realtime/hub.js';
 import type { DevAuth } from '../auth/dev.js';
+import type { Persistence } from '../storage/persistence.js';
 
 export interface RouteContext {
   config: AppConfig;
@@ -13,4 +14,5 @@ export interface RouteContext {
   db: () => Database;
   /** Runs `fn` in a transaction, then publishes the events it queued. */
   mutate: <T>(fn: (q: Tx, outbox: Outbox) => Promise<T>) => Promise<T>;
+  persistence: Persistence | null;
 }

@@ -11,29 +11,44 @@ import { readEventsSince } from '../realtime/replay.js';
 const startedAt = Date.now();
 
 export async function systemRoutes(app: FastifyInstance, ctx: RouteContext): Promise<void> {
-  const { config, auth, db, hub, devAuth } = ctx;
+  const { config, auth, db, hub, devAuth, persistence } = ctx;
 
   /**
    * Liveness for Render's health check: returns 200 whenever the process can serve requests.
    * Add ?strict=1 to get 503 until the database and sign-in are configured and reachable.
    */
   app.get('/api/health', { config: { rateLimit: false } }, async (req, reply) => {
-    let database: 'ok' | 'not_configured' | 'error' = 'not_configured';
+    let database: 'ok' | 'not_configured' | 'loading' | 'error' = 'not_configured';
     try {
       const d = db();
       await d.ping();
       database = 'ok';
     } catch (err) {
-      database = err instanceof ApiError && err.code === 'not_configured' ? 'not_configured' : 'error';
+      database =
+        err instanceof ApiError && err.code === 'not_configured'
+          ? 'not_configured'
+          : err instanceof ApiError && err.code === 'storage_loading'
+            ? 'loading'
+            : 'error';
     }
     const authMode = isEntraConfigured(config) ? 'entra' : devAuth ? 'dev' : 'not_configured';
     const ready = database === 'ok' && authMode !== 'not_configured';
     const strict = (req.query as { strict?: string }).strict === '1';
     if (strict && !ready) reply.code(503);
     reply.header('cache-control', 'no-store');
+    const storageStatus = persistence?.status();
     return {
       status: ready ? 'ok' : 'degraded',
       database,
+      storage: storageStatus
+        ? {
+            mode: storageStatus.mode,
+            state: storageStatus.state,
+            pendingChanges: storageStatus.pendingChanges,
+            lastSavedAt: storageStatus.lastSavedAt,
+            lastError: storageStatus.lastError,
+          }
+        : { mode: config.storage.mode, ...(config.storage.problem ? { problem: config.storage.problem } : {}) },
       auth: authMode,
       realtimeConnections: hub.connectionCount(),
       version: config.version,
@@ -61,7 +76,7 @@ export async function systemRoutes(app: FastifyInstance, ctx: RouteContext): Pro
       authMode: entra ? 'entra' : devAuth ? 'dev' : 'not_configured',
       entra,
       allowedDomains: config.allowedEmailDomains,
-      databaseConfigured: Boolean(config.database.url || config.database.pgliteDir),
+      databaseConfigured: Boolean(config.database.url || config.database.pgliteDir || config.storage.github),
       version: config.version,
     };
   });

@@ -6,6 +6,7 @@ import websocket from '@fastify/websocket';
 import { decodeJwt } from 'jose';
 import { isEntraConfigured, type AppConfig } from './config.js';
 import type { Database, Tx } from './db/database.js';
+import type { Persistence } from './storage/persistence.js';
 import { createTokenVerifier, type TokenVerifier } from './auth/verify.js';
 import { createDevAuth, type DevAuth } from './auth/dev.js';
 import { createAuth } from './http/auth.js';
@@ -25,6 +26,8 @@ export interface BuildOptions {
   /** Inject a verifier (tests). Defaults to Entra ID verification when configured. */
   verifier?: TokenVerifier | null;
   devAuth?: DevAuth | null;
+  /** GitHub snapshot storage: requests wait until the stored data has been loaded. */
+  persistence?: Persistence | null;
   logger?: boolean | Record<string, unknown>;
 }
 
@@ -88,11 +91,19 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
   }
 
   const hub = new RealtimeHub();
-  const auth = createAuth({ config, db, verifier, hub });
-  const requireDb = (): Database => {
-    if (!db) throw new ApiError(503, 'not_configured', 'TaskSync database is not configured yet');
+  const persistence = opts.persistence ?? null;
+  const auth = createAuth({ config, db, verifier, hub, assertReady: () => void requireDb() });
+  // eslint-disable-next-line prefer-const
+  function requireDb(): Database {
+    if (!db) throw new ApiError(503, 'not_configured', config.storage.problem ?? 'TaskSync database is not configured yet');
+    if (persistence && !persistence.ready) {
+      const s = persistence.status();
+      throw s.state === 'error'
+        ? new ApiError(503, 'storage_unavailable', 'TaskSync cannot reach its data store right now. Retrying.')
+        : new ApiError(503, 'storage_loading', 'TaskSync is loading its data');
+    }
     return db;
-  };
+  }
   const mutate = async <T>(fn: (q: Tx, outbox: Outbox) => Promise<T>): Promise<T> => {
     const database = requireDb();
     for (let attempt = 1; ; attempt++) {
@@ -111,7 +122,7 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
       }
     }
   };
-  const ctx: RouteContext = { config, auth, hub, devAuth, db: requireDb, mutate };
+  const ctx: RouteContext = { config, auth, hub, devAuth, db: requireDb, mutate, persistence };
 
   // ---- Platform plugins -----------------------------------------------------
   await app.register(helmet, {

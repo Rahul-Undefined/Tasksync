@@ -41,6 +41,15 @@ const envSchema = z.object({
   /** Development only: directory for an embedded PGlite database. Use "memory" for an in-memory database. */
   PGLITE_DATA_DIR: z.string().optional(),
 
+  /** GitHub storage (no external database): encrypted snapshots in a private repository. */
+  GITHUB_DATA_TOKEN: z.string().trim().optional(),
+  GITHUB_DATA_REPO: z.string().trim().optional(),
+  GITHUB_DATA_BRANCH: z.string().trim().default('main'),
+  GITHUB_API_URL: z.string().url().default('https://api.github.com'),
+  DATA_ENCRYPTION_KEY: z.string().optional(),
+  /** Set by Render, e.g. "Rahul-Undefined/Tasksync"; used to guess the data repository's owner. */
+  RENDER_GIT_REPO_SLUG: z.string().optional(),
+
   ENTRA_TENANT_ID: uuid.optional(),
   ENTRA_CLIENT_ID: uuid.optional(),
   ENTRA_API_SCOPE: z.string().default('access_as_user'),
@@ -69,8 +78,23 @@ const envSchema = z.object({
   REALTIME_RETENTION_HOURS: z.coerce.number().int().min(1).max(24 * 30).default(72),
 });
 
+export interface GitHubStorageConfig {
+  repo: string;
+  token: string;
+  branch: string;
+  apiUrl: string;
+  encryptionKey: string;
+}
+
 export interface AppConfig {
   env: 'development' | 'production' | 'test';
+  storage: {
+    /** postgres = DATABASE_URL; github = in-memory PostgreSQL saved to a private GitHub repo; pglite = local dev. */
+    mode: 'postgres' | 'github' | 'pglite' | 'none';
+    github?: GitHubStorageConfig;
+    /** Why the configured storage can't be used yet (shown in /api/health). */
+    problem?: string;
+  };
   port: number;
   host: string;
   logLevel: string;
@@ -125,8 +149,32 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     d.toLowerCase().replace(/^@/, ''),
   );
 
+  const storage: AppConfig['storage'] = { mode: 'none' };
+  if (e.DATABASE_URL) {
+    storage.mode = 'postgres';
+  } else if (e.GITHUB_DATA_TOKEN) {
+    storage.mode = 'github';
+    const owner = e.RENDER_GIT_REPO_SLUG?.split('/')[0];
+    const repo = e.GITHUB_DATA_REPO ?? (owner ? `${owner}/tasksync-data` : undefined);
+    if (!repo) storage.problem = 'Set GITHUB_DATA_REPO to owner/name of the private data repository';
+    else if (!e.DATA_ENCRYPTION_KEY || e.DATA_ENCRYPTION_KEY.length < 16) {
+      storage.problem = 'Set DATA_ENCRYPTION_KEY to a secret of at least 16 characters (keep a copy: without it the data cannot be read)';
+    } else {
+      storage.github = {
+        repo,
+        token: e.GITHUB_DATA_TOKEN,
+        branch: e.GITHUB_DATA_BRANCH,
+        apiUrl: e.GITHUB_API_URL,
+        encryptionKey: e.DATA_ENCRYPTION_KEY,
+      };
+    }
+  } else if (!production && e.PGLITE_DATA_DIR) {
+    storage.mode = 'pglite';
+  }
+
   return {
     env: e.NODE_ENV,
+    storage,
     port: e.PORT,
     host: e.HOST,
     logLevel: e.LOG_LEVEL,

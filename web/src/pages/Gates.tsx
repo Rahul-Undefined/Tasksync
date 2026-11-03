@@ -153,7 +153,7 @@ export function SetupScreen({ config }: { config: ClientConfig | null }) {
       <p className="tagline">The server is running but still needs its one-time configuration.</p>
       <div className="col" style={{ width: '100%', textAlign: 'left', gap: 8 }}>
         <div className={`banner glass ${config?.databaseConfigured ? '' : 'warn'}`}>
-          {config?.databaseConfigured ? <Check size={16} /> : <AlertTriangle size={16} />} Database (Supabase PostgreSQL)
+          {config?.databaseConfigured ? <Check size={16} /> : <AlertTriangle size={16} />} Data storage (private GitHub repository)
         </div>
         <div className={`banner glass ${config?.authMode === 'not_configured' ? 'warn' : ''}`}>
           {config?.authMode === 'not_configured' ? <AlertTriangle size={16} /> : <Check size={16} />} Microsoft Entra ID sign-in

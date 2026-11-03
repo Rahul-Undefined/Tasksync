@@ -180,6 +180,8 @@ export async function createPgliteDatabase(dataDir?: string): Promise<Database> 
 
 export async function createDatabase(config: AppConfig): Promise<Database | null> {
   if (config.database.url) return createPostgresDatabase(config.database);
+  // GitHub storage: the live database is in memory; Persistence restores and saves it.
+  if (config.storage.mode === 'github') return config.storage.github ? createPgliteDatabase('memory') : null;
   if (config.env !== 'production' && config.database.pgliteDir) {
     return createPgliteDatabase(config.database.pgliteDir);
   }

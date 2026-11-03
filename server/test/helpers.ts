@@ -9,6 +9,8 @@ import { createPgliteDatabase, createPostgresDatabase, type Database } from '../
 import { runMigrations } from '../src/db/migrate.js';
 import { createTokenVerifier } from '../src/auth/verify.js';
 import type { RealtimeHub } from '../src/realtime/hub.js';
+import type { SnapshotStore } from '../src/storage/github.js';
+import { Persistence, trackWrites } from '../src/storage/persistence.js';
 
 // Fictional tenant and people. No real Omnifi identities or data are used in tests.
 export const TENANT = '7a3b0c1d-2e4f-4a5b-8c6d-1e2f3a4b5c6d';
@@ -31,6 +33,7 @@ export interface Res<T = any> {
 export interface TestEnv {
   app: FastifyInstance;
   db: Database;
+  persistence: Persistence | null;
   hub: RealtimeHub;
   mint(email: string, claims?: Record<string, unknown>, opts?: { iss?: string; aud?: string; exp?: string; key?: 'good' | 'rogue' }): Promise<string>;
   req<T = any>(method: string, url: string, token?: string, body?: unknown, headers?: Record<string, string>): Promise<Res<T>>;
@@ -40,7 +43,12 @@ export interface TestEnv {
   close(): Promise<void>;
 }
 
-export async function createTestEnv(envOverrides: Record<string, string> = {}): Promise<TestEnv> {
+export interface TestStorage {
+  store: SnapshotStore;
+  key: string;
+}
+
+export async function createTestEnv(envOverrides: Record<string, string> = {}, storage?: TestStorage): Promise<TestEnv> {
   const good = await generateKeyPair('RS256', { extractable: true });
   const rogue = await generateKeyPair('RS256', { extractable: true });
   const jwk: JWK = { ...(await exportJWK(good.publicKey)), kid: 'test-key', alg: 'RS256' };
@@ -63,9 +71,17 @@ export async function createTestEnv(envOverrides: Record<string, string> = {}): 
     RATE_LIMIT_PER_MINUTE: '100000',
     ...envOverrides,
   });
-  const db = await createTestDatabase();
-  await runMigrations(db);
-  const { app, hub } = await buildApp({ config, db, verifier });
+  const rawDb = await createTestDatabase();
+  await runMigrations(rawDb);
+  let db = rawDb;
+  let persistence: Persistence | null = null;
+  if (storage) {
+    persistence = new Persistence(rawDb, storage.store, storage.key, { debounceMs: 30, maxDelayMs: 200, watchWindowMs: 0, log: () => {} });
+    const p = persistence;
+    db = trackWrites(rawDb, () => p.markDirty());
+    await p.start();
+  }
+  const { app, hub } = await buildApp({ config, db, verifier, persistence });
   await app.ready();
 
   const mint: TestEnv['mint'] = async (email, claims = {}, opts = {}) => {
@@ -128,6 +144,7 @@ export async function createTestEnv(envOverrides: Record<string, string> = {}): 
   return {
     app,
     db,
+    persistence,
     hub,
     mint,
     req,
@@ -135,6 +152,7 @@ export async function createTestEnv(envOverrides: Record<string, string> = {}): 
     admin,
     async close() {
       await app.close();
+      await persistence?.stop();
       await db.close();
     },
   };

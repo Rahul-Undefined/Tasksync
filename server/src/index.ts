@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import { buildApp } from './app.js';
 import { loadConfig, isEntraConfigured } from './config.js';
 import { createDatabase } from './db/database.js';
+import { GitHubSnapshotStore } from './storage/github.js';
+import { Persistence, trackWrites } from './storage/persistence.js';
 import { discoverTenantId } from './auth/tenant.js';
 import { runMigrations } from './db/migrate.js';
 
@@ -31,21 +33,36 @@ async function main() {
     );
   }
 
-  const db = await createDatabase(config);
-  if (db) {
-    const applied = await runMigrations(db, (m) => console.log(`[migrate] ${m}`));
+  const rawDb = await createDatabase(config);
+  let db = rawDb;
+  let persistence: Persistence | null = null;
+  if (rawDb) {
+    const applied = await runMigrations(rawDb, (m) => console.log(`[migrate] ${m}`));
     console.log(`[migrate] ${applied.length ? `applied ${applied.join(', ')}` : 'schema up to date'}`);
-  } else {
-    console.warn('[startup] DATABASE_URL is not set. The API will report "not_configured" until it is.');
+  }
+  if (rawDb && config.storage.github) {
+    const g = config.storage.github;
+    persistence = new Persistence(rawDb, new GitHubSnapshotStore({ repo: g.repo, token: g.token, branch: g.branch, apiUrl: g.apiUrl }), g.encryptionKey);
+    const p = persistence;
+    db = trackWrites(rawDb, () => p.markDirty());
+    console.log(`[storage] using encrypted snapshots in github:${g.repo} (branch ${g.branch})`);
+    // Load in the background so the port opens quickly; requests get 503 "loading" until it's done.
+    void p.start();
+  } else if (config.storage.problem) {
+    console.warn(`[startup] storage not ready: ${config.storage.problem}`);
+  } else if (!rawDb) {
+    console.warn('[startup] No data storage configured (GITHUB_DATA_TOKEN or DATABASE_URL). The API reports "not_configured".');
   }
   if (!isEntraConfigured(config) && !config.devAuth) {
     console.warn('[startup] ENTRA_CLIENT_ID is not set. Sign-in is disabled until it is.');
   }
 
-  const { app } = await buildApp({ config, db, logger });
+  const { app } = await buildApp({ config, db, logger, persistence });
   const shutdown = async (signal: string) => {
     app.log.info(`${signal} received, shutting down`);
     await app.close().catch(() => undefined);
+    // Save unsaved changes before the instance goes away (Render allows ~30 s).
+    await persistence?.stop().catch(() => undefined);
     await db?.close().catch(() => undefined);
     process.exit(0);
   };

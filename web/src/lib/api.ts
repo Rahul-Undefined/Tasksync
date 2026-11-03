@@ -84,8 +84,10 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
     const isJson = (res.headers.get('content-type') ?? '').includes('application/json');
     if ((RETRYABLE.has(res.status) || (!isJson && path.startsWith('/api/') && res.ok)) && retry && Date.now() < deadline) {
       const body = isJson ? await res.clone().json().catch(() => null) : null;
-      // 503 "not_configured" from our own API is permanent, not a cold start.
-      if (!body?.error?.code || body.error.code === 'internal_error') {
+      // 503 "not_configured" from our own API is permanent, not a cold start; "storage_loading"
+      // and "storage_unavailable" clear up by themselves once the server has its data.
+      const transient = ['internal_error', 'storage_loading', 'storage_unavailable'];
+      if (!body?.error?.code || transient.includes(body.error.code)) {
         setWaking(true);
         await sleep(Math.min(1500 * attempt, 8000));
         continue;

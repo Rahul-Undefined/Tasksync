@@ -135,6 +135,24 @@ describe('RealtimeClient', () => {
     t.client.stop();
   });
 
+  it('follows the server cursor after a resync, even when it went down (data restored elsewhere)', async () => {
+    const t = setup();
+    t.client.start();
+    await openAndReady(t.sockets[0]!, 900);
+    t.sockets[0]!.close(1006, 'server restarted');
+    await vi.advanceTimersByTimeAsync(1100);
+    const s = t.sockets[1]!;
+    s.open();
+    await vi.waitFor(() => expect(s.sent.length).toBe(1));
+    expect(s.sent[0]).toMatchObject({ since: 900 });
+    s.receive({ type: 'resync', reason: 'missed_events', lastEventId: 120 });
+    s.receive({ type: 'ready', userId: 'u', lastEventId: 120, replayed: 0 });
+    expect(t.client.cursor).toBe(120);
+    s.receive({ type: 'event', event: ev(121) });
+    expect(t.events).toEqual([121]); // not dropped as a "duplicate" of the old, higher cursor
+    t.client.stop();
+  });
+
   it('backoff grows exponentially with jitter and is capped at 30s', () => {
     const t = setup();
     const delays = [1, 2, 3, 4, 5, 6, 10].map((a) => t.client.backoffDelay(a));
