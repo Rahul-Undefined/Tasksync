@@ -70,7 +70,7 @@ That session also found two UI bugs, both fixed (stale mention directory; contex
 |---|---|
 | Real Microsoft sign-in (approved account, personal account, external tenant) | Entra app registration (DEPLOYMENT_GUIDE §2) |
 | Persistence on Supabase | Supabase project + `DATABASE_URL` (§1) |
-| Live deployment at `tasksync-vgam.onrender.com` | Render build/start commands and env vars (§4) |
+| Live deployment fully configured | Code **is deployed and verified** (2026-11-03, commit `8515a08`, Render Docker runtime): dashboard, manifest and icons served; HSTS/CSP headers present; dev sign-in disabled (404); data routes require sign-in (401); `/api/health` reports `degraded` because `DATABASE_URL` and the Entra IDs aren't set yet (§1, §2, §4.3) |
 
 ## Bugs found by testing and fixed
 

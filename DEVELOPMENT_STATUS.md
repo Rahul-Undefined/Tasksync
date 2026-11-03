@@ -4,8 +4,8 @@ _Last updated: 2026-11-03_
 
 ## Summary
 
-The MVP is **built and tested locally end to end**: API, database schema, web dashboard, Windows desktop
-companion and Teams workflow. It is **not live yet**. Going live needs three configuration steps only you or Omnifi
+The MVP is **built and tested end to end** and **the code is deployed** at <https://tasksync-vgam.onrender.com>
+(Render Docker runtime, verified 2026-11-03). It shows "TaskSync is almost ready" until it is configured. Going live needs three configuration steps only you or Omnifi
 IT can do (Supabase project, Entra app registration, Render settings). All three are free and described in
 [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
 
@@ -64,7 +64,7 @@ ARCHITECTURE, SECURITY, DEPLOYMENT_GUIDE, `.env.example`.
 
 | Item | Notes |
 |---|---|
-| Live deployment verification | After Render env vars are set (Blocked) |
+| Live sign-in and data verification | After the Supabase and Entra variables are set in Render (Blocked) |
 | Real Entra sign-in tests (approved / personal / other tenant) | After app registration (Blocked) |
 | Manual desktop checks | Win+D, peek, tray menu, toast look, Teams paste, live screen share (TEST_REPORT "Not tested") |
 | Native desktop app rollout | Only if IT agrees to trust/sign it; until then the Edge app is the desktop experience |
