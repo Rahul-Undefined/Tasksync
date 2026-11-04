@@ -10,11 +10,11 @@ Microsoft accounts yet, because the Entra app registration and Supabase project 
 
 | Suite | Command | Result |
 |---|---|---|
-| API integration: auth (incl. no-admin ID-token sign-in), onboarding, task workflow, permissions, realtime, hardening, zero-paperwork config, **GitHub snapshot storage** (encryption, exact restore, fake GitHub API incl. empty repo and bad token, restart restore, outage safety, failed-save retry, shutdown flush) (in-memory PostgreSQL / PGlite) | `npm test -w server` | **75 passed / 0 failed** |
+| API integration: auth (incl. no-admin ID-token sign-in), onboarding, task workflow, permissions, realtime, hardening, zero-paperwork config, **GitHub snapshot storage** (encryption, exact restore, fake GitHub API incl. empty repo and bad token, restart restore, outage safety, failed-save retry, shutdown flush) (in-memory PostgreSQL / PGlite) | `npm test -w server` | **80 passed / 0 failed** (incl. Windows-app update endpoint) |
 | Same 75 tests against a **real PostgreSQL 18 server** (concurrent connections, row locks) | `npm run test:pg` | **75 passed / 0 failed** |
 | Same API suite on **SQLite** (the engine used with GitHub storage on Render) | `npm run test:sqlite -w server` | **74 passed / 0 failed / 1 skipped** (PostgreSQL-only row-level-security check) |
 | Web unit: realtime client (dedupe, backoff, 4401/4403, resync incl. cursor going down after a restore, HTTP fallback), ID-token refresh timing, list rules, mentions, Teams links | `npm test -w web` | **21 passed / 0 failed** |
-| Desktop unit: settings, off-screen recovery, auto-start (throwaway registry key), URL allowlists, bridge validation, real clipboard | `npm run test:desktop` | **42 passed / 0 failed** |
+| Desktop unit: settings, off-screen recovery, auto-start (throwaway registry key), URL allowlists, bridge validation, real clipboard, **self-update** (version compare, GitHub-only https downloads, SHA-256 mismatch rejected, zip path escape rejected, clean-up, Start-with-Windows follows the new folder) | `npm run test:desktop` | **60 passed / 0 failed** |
 | Web E2E in **Microsoft Edge**, two separate user profiles (incl. installable-app manifest and pop-out widget) | `npm run test:e2e` | **7 passed / 0 failed** |
 | Desktop E2E: real WinForms + WebView2 app, driven over CDP, Windows effects checked | `npm run test:e2e:desktop` | **9 passed / 0 failed** |
 | Dependency audit | `npm audit` | **0 vulnerabilities** |

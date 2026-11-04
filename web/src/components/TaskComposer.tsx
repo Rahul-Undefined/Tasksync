@@ -33,7 +33,6 @@ export function TaskComposer({ compact, autoFocus }: { compact?: boolean; autoFo
   };
 
   const reset = () => {
-    setTitle('');
     setAssignees([]);
     setSelf(true);
     setSelfTouched(false);
@@ -62,6 +61,8 @@ export function TaskComposer({ compact, autoFocus }: { compact?: boolean; autoFo
       const names = [...(self ? ['you'] : []), ...assignees.map((a) => a.displayName)];
       if (getState().queued === 0) toast({ kind: 'success', title: 'Task created', body: `Assigned to ${names.join(', ')}.` }, 3000);
       reset();
+      // Keep anything typed while the task was being saved (e.g. the next task).
+      setTitle((current) => (current.trim() === t ? '' : current));
     } catch (err) {
       toastError(err, 'Could not create the task');
     } finally {

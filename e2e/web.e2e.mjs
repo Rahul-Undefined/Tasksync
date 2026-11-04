@@ -132,7 +132,7 @@ describe('Web dashboard in Microsoft Edge', () => {
     const supported = await admin.evaluate(() => 'documentPictureInPicture' in window);
     assert.ok(supported, 'Edge should support Document Picture-in-Picture');
     await admin.getByRole('button', { name: /Pop out widget/ }).click();
-    await admin.waitForFunction(() => window.documentPictureInPicture?.window?.document.querySelector('.widget .stat'), null, { timeout: 10000 });
+    await admin.waitForFunction(() => window.documentPictureInPicture?.window?.document.querySelector('.widget .wg-panel'), null, { timeout: 10000 });
 
     const adminUser = await api.me(ADMIN);
     await api.call(ALEX, 'POST', '/api/tasks', { title: 'Seen in the floating widget', assigneeIds: [adminUser.id] });

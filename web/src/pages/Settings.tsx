@@ -272,9 +272,35 @@ function DesktopWithoutInstall() {
           <span className="small faint">Needs Microsoft Edge 116+</span>
         )}
       </div>
+      <NativeDownload />
+    </div>
+  );
+}
+
+/** Link to the newest native Windows build (it keeps itself up to date once installed). */
+function NativeDownload() {
+  const [latest, setLatest] = useState<{ version: string; url: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/desktop/latest')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((v) => alive && v && setLatest(v))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return (
+    <div className="col" style={{ gap: 4 }}>
       <p className="tiny faint" style={{ margin: 0 }}>
-        The native Windows companion (hidden from screen sharing, stays on Win+D) needs IT to approve its installer on Omnifi PCs.
+        The native Windows app (hidden from screen sharing, stays on Win+D) updates itself automatically once installed. On Omnifi
+        PCs, Windows security blocks apps that aren't signed or approved, so it needs IT to allow it first.
       </p>
+      {latest && (
+        <a className="tiny" href={latest.url} rel="noopener noreferrer">
+          Download TaskSync for Windows {latest.version} (zip, needs the .NET 8 Desktop Runtime)
+        </a>
+      )}
     </div>
   );
 }

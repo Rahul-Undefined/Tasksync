@@ -16,6 +16,7 @@ import { Outbox, RealtimeHub } from './realtime/hub.js';
 import { pruneEvents } from './realtime/replay.js';
 import { realtimeRoutes } from './realtime/ws.js';
 import type { RouteContext } from './routes/context.js';
+import { desktopRoutes } from './routes/desktop.js';
 import { systemRoutes } from './routes/system.js';
 import { taskRoutes } from './routes/tasks.js';
 import { userRoutes } from './routes/users.js';
@@ -207,6 +208,7 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
   await userRoutes(app, ctx);
   await taskRoutes(app, ctx);
   await realtimeRoutes(app, ctx);
+  await desktopRoutes(app, ctx);
   const servingWeb = registerStatic(app, config.webDistDir);
   if (!servingWeb) {
     app.setNotFoundHandler((_req, reply) =>

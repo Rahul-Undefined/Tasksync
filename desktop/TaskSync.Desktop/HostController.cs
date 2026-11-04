@@ -29,8 +29,12 @@ public sealed class HostController : ApplicationContext
     private readonly ToolStripMenuItem _expandedItem;
     private readonly ToolStripMenuItem _captureItem;
     private readonly ToolStripMenuItem _desktopItem;
+    private readonly ToolStripMenuItem _updateItem;
+    private readonly Updater? _updater;
+    private System.Threading.Timer? _updateTimer;
+    private string? _updateReady;
 
-    public HostController(AppSettings settings, bool startMinimized, AutoStart? autoStart = null)
+    public HostController(AppSettings settings, bool startMinimized, AutoStart? autoStart = null, bool updates = false)
     {
         Settings = settings;
         Policy = new UrlPolicy(settings.BaseUrl);
@@ -50,7 +54,9 @@ public sealed class HostController : ApplicationContext
         {
             Checked = Settings.StayOnDesktop,
         };
+        _updateItem = new ToolStripMenuItem("Restart to update", null, (_, _) => RestartToUpdate()) { Visible = false };
         var menu = new ContextMenuStrip { ShowImageMargin = false, RenderMode = ToolStripRenderMode.System };
+        menu.Items.Add(_updateItem);
         menu.Items.Add(new ToolStripMenuItem("Show TaskSync widget", null, (_, _) => ShowWidget()) { Font = new Font(menu.Font, FontStyle.Bold) });
         menu.Items.Add(new ToolStripMenuItem("Open dashboard", null, (_, _) => OpenDashboard("/")));
         menu.Items.Add(new ToolStripSeparator());
@@ -59,7 +65,11 @@ public sealed class HostController : ApplicationContext
         menu.Items.Add(_captureItem);
         menu.Items.Add(_desktopItem);
         menu.Items.Add(_autoStartItem);
-        menu.Items.Add(new ToolStripMenuItem("Settings", null, (_, _) => OpenDashboard("/settings")));
+        menu.Items.Add(new ToolStripMenuItem("Settings", null, (_, _) =>
+        {
+            ShowWidget();
+            _widget.PostMessage(HostMessages.OpenSheet("settings"));
+        }));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Exit TaskSync", null, (_, _) => Exit()));
 
@@ -98,6 +108,53 @@ public sealed class HostController : ApplicationContext
             _widget.Show();
         }
         Services.Log("started", new { version = Version, baseUrl = Settings.BaseUrl, minimized = startMinimized });
+
+        if (updates)
+        {
+            _updater = new Updater();
+            try
+            {
+                if (AutoStart.RefreshPath()) Services.Log("autoStartMoved");
+                _updater.CleanUp(Version);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+            }
+            // First check shortly after start, then every 6 hours while running.
+            _updateTimer = new System.Threading.Timer(_ => _ = CheckForUpdateAsync(), null, TimeSpan.FromSeconds(45), TimeSpan.FromHours(6));
+        }
+    }
+
+    private async Task CheckForUpdateAsync()
+    {
+        if (_updater is null || Exiting) return;
+        string? staged;
+        try
+        {
+            staged = await _updater.CheckAsync(Settings.BaseUrl, Version).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or System.Text.Json.JsonException or NotSupportedException)
+        {
+            return; // offline or server busy: try again next time
+        }
+        if (staged is null || staged == _updateReady || Exiting) return;
+        _widget.BeginInvoke(() =>
+        {
+            _updateReady = staged;
+            _updateItem.Text = $"Restart to update to {staged}";
+            _updateItem.Visible = true;
+            Toast($"TaskSync {staged} is ready", "It is used automatically next time TaskSync starts, or right-click the tray icon → Restart to update.", null);
+            BroadcastState();
+        });
+    }
+
+    /// <summary>Starts the downloaded version and exits this one.</summary>
+    public void RestartToUpdate()
+    {
+        if (_updater?.NewestStaged(Version) is not { } staged) return;
+        Settings.Save();
+        if (Updater.Launch(staged.ExePath, [])) Exit();
+        else Toast("Could not start the update", "Windows did not allow the new version to start. TaskSync keeps running the current version.", null);
     }
 
     private static Icon LoadIcon()
@@ -124,7 +181,8 @@ public sealed class HostController : ApplicationContext
         SafeAutoStartEnabled(),
         Settings.Mode == WidgetMode.Compact ? "compact" : "expanded",
         Settings.HideFromScreenCapture,
-        Settings.StayOnDesktop);
+        Settings.StayOnDesktop,
+        _updateReady);
 
     // ---- Commands --------------------------------------------------------------
 
@@ -283,6 +341,9 @@ public sealed class HostController : ApplicationContext
                 if (source == _widget) _widget.HideToTray();
                 Services.Log("minimizeToTray");
                 break;
+            case "restartToUpdate":
+                RestartToUpdate();
+                break;
             case "setBadge":
                 var count = Math.Max(0, msg.GetInt("count") ?? 0);
                 _tray.Text = count == 0 ? "TaskSync — all caught up" : $"TaskSync — {count} open task{(count == 1 ? "" : "s")}";
@@ -306,6 +367,7 @@ public sealed class HostController : ApplicationContext
         if (disposing)
         {
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+            _updateTimer?.Dispose();
             _tray.Dispose();
         }
         base.Dispose(disposing);

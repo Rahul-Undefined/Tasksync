@@ -284,6 +284,19 @@ they meet a prevalence, age, or trusted list criterion"* is in block mode, so a 
 Don't try to get around it: the native app can only be used if IT adds it to their trusted list or it's signed
 with a certificate Omnifi trusts. Until then, use the Edge app above.
 
+### Native app updates
+Installed copies update themselves; nobody has to download a new version by hand:
+
+1. Release a version: `git tag desktop-v0.2.1` then `git push origin desktop-v0.2.1`. The **Desktop release**
+   GitHub Action (free on a public repo) tests, builds and publishes `TaskSync-win-x64.zip` as a GitHub release.
+2. The TaskSync server reads the newest `desktop-v*` release (`GET /api/desktop/latest`, cached 10 min).
+   It uses the code repository Render deploys from; set `DESKTOP_RELEASES_REPO=owner/name` to use another.
+3. Each running app checks 45 seconds after start and every 6 hours, downloads the zip, checks its SHA-256 against
+   the one GitHub published, and unpacks it to `%LOCALAPPDATA%\TaskSync\versions\<version>` (no admin rights).
+   The next start uses it, or **tray icon → Restart to update** / the ⟳ button in the widget. "Start with Windows"
+   follows it to the new folder, and old versions are removed.
+
+The Defender rule above applies to every new build as well: on Omnifi PCs updates work only once IT trusts the app.
 Developers can still build and test it (`npm run publish:desktop`, `npm run test:e2e:desktop`). The test harness
 starts the build through the signed `dotnet` host on the developer's own machine. That's for testing, not a way
 to distribute the app.

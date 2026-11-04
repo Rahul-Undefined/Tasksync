@@ -695,15 +695,235 @@ input[type='datetime-local'].input { color-scheme: dark; }
 /* ---------------------------------------------------------------------------
    Desktop widget (WebView2)
    --------------------------------------------------------------------------- */
-.widget { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; padding: 8px; gap: 8px; }
-.widget-bar { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 16px; user-select: none; cursor: grab; }
-.widget-bar:active { cursor: grabbing; }
-.widget-bar .icon-btn { width: 28px; height: 28px; border-radius: 8px; }
-.widget-body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px; }
-.widget .task-card { padding: 10px 12px; gap: 10px; border-radius: 16px; }
+/* A compact utility window: slim title bar, one big panel, a bottom bar of toggles. */
+body:has(.widget) { background: #0b1022; }
+body:has(.widget) .backdrop { opacity: 0.35; }
+.widget {
+  --wg-bg: #0d1328;
+  --wg-panel: #121a33;
+  --wg-line: rgba(140, 160, 255, 0.14);
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(13, 19, 40, 0.94), rgba(9, 13, 28, 0.97));
+  /* thin accent frame around the whole window */
+  box-shadow: inset 0 0 0 1px rgba(124, 108, 255, 0.55);
+  overflow: hidden;
+}
+.wg-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  flex: none;
+  padding: 0 6px 0 14px;
+  user-select: none;
+  border-bottom: 1px solid var(--wg-line);
+}
+.wg-host .wg-title { cursor: grab; }
+.wg-host .wg-title:active { cursor: grabbing; }
+.wg-logo {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: #fff;
+  background: var(--accent-grad);
+  box-shadow: 0 0 14px rgba(124, 108, 255, 0.55);
+}
+.wg-name { font-family: var(--font-display); font-weight: 800; font-size: 13px; letter-spacing: 0.22em; color: #f3f5ff; }
+.wg-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--warning);
+  cursor: default;
+  font-size: 0;
+}
+.wg-dot.live { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.wg-dot.polling { background: var(--info); box-shadow: 0 0 8px var(--info); }
+.wg-dot.offline, .wg-dot.denied { background: var(--danger); cursor: pointer; }
+.wg-dot:has(span) { height: 16px; padding: 0 6px; font-size: 10px; font-weight: 700; color: #1a1300; }
+.wg-win {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.wg-win:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+.wg-win.close:hover { background: #c42b1c; color: #fff; }
+.wg-panel {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 10px 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--wg-panel);
+  border: 1px solid var(--wg-line);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 14px 40px -24px rgba(0, 0, 0, 0.9);
+  overflow: hidden;
+}
+.widget .composer { padding: 0; gap: 8px; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+.widget .composer::before { display: none; }
+.widget .composer-main .input {
+  height: 46px;
+  font-size: 15px;
+  border-radius: 12px;
+  background: rgba(5, 8, 20, 0.55);
+  border-color: var(--wg-line);
+}
+.widget .composer-main .btn { width: 46px; height: 46px !important; padding: 0; border-radius: 12px; }
+.widget .composer .chip { font-size: 11.5px; }
+.wg-tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.wg-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.wg-tabs button:hover { color: var(--text); }
+.wg-tabs button.on { color: var(--text); background: rgba(124, 140, 255, 0.14); border-color: rgba(124, 140, 255, 0.3); }
+.wg-tabs b { font-weight: 650; color: var(--text-2); }
+.wg-tabs b.hot { color: #fff; background: var(--danger); border-radius: 999px; padding: 0 5px; font-size: 10.5px; }
+.wg-due { font-size: 11.5px; color: var(--text-3); }
+.wg-due .late { color: #ff9b9b; }
+.wg-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; margin: 0 -4px; padding: 0 4px 4px; }
+.widget .task-card { padding: 9px 11px; gap: 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.035); }
 .widget .task-card .title { font-size: 13.5px; }
-.widget .composer { padding: 8px; }
-.widget .composer-main .input { height: 38px; font-size: 13.5px; }
-.widget-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.widget-stats .stat { padding: 8px 10px; border-radius: 14px; }
-.widget-stats .stat .v { font-size: 19px; }
+.wg-empty { text-align: center; padding: 26px 12px; color: var(--text-3); font-size: 13px; }
+.wg-alert {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--wg-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.wg-alert.read { opacity: 0.6; }
+.wg-alert .sub { font-size: 11px; color: var(--text-3); }
+.wg-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  background: rgba(15, 21, 44, 0.98);
+  border-radius: inherit;
+  animation: wg-rise 0.18s var(--ease);
+}
+@keyframes wg-rise { from { opacity: 0; transform: translateY(8px); } }
+.wg-sheet-head { display: flex; align-items: center; margin-bottom: 8px; }
+.wg-sheet-body { display: flex; flex-direction: column; gap: 12px; overflow: auto; min-height: 0; font-size: 13px; }
+.wg-row { display: flex; align-items: center; gap: 12px; }
+.wg-foot { display: flex; align-items: center; gap: 6px; flex: none; height: 50px; padding: 0 10px; }
+.wg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 11px 0 5px;
+  border: 1px solid var(--wg-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.wg-pill .knob { position: relative; width: 26px; height: 16px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); transition: background 0.2s; }
+.wg-pill .knob::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #c9cfe8;
+  transition: transform 0.2s var(--ease);
+}
+.wg-pill.on { color: var(--text); border-color: rgba(124, 140, 255, 0.35); }
+.wg-pill.on .knob { background: var(--accent-grad); }
+.wg-pill.on .knob::after { transform: translateX(10px); background: #fff; }
+.wg-tool {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--wg-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.wg-tool:hover, .wg-tool.on { color: var(--text); background: rgba(124, 140, 255, 0.14); }
+.wg-tool.spark { color: #c9b8ff; }
+.wg-tool.update { color: #fff; background: var(--accent-grad); border-color: transparent; }
+@media (max-width: 360px) {
+  .wg-pill { padding-right: 8px; }
+  .wg-name { letter-spacing: 0.14em; }
+}
+
+/* Installed Edge app: our title bar sits in the window's caption area, next to Windows' own buttons. */
+@media (display-mode: window-controls-overlay) {
+  .wg-browser .wg-title {
+    position: fixed;
+    top: env(titlebar-area-y, 0);
+    left: env(titlebar-area-x, 0);
+    width: env(titlebar-area-width, 100%);
+    height: env(titlebar-area-height, 40px);
+    z-index: 10;
+    app-region: drag;
+    -webkit-app-region: drag;
+    border-bottom: 0;
+  }
+  .wg-browser .wg-title button { app-region: no-drag; -webkit-app-region: no-drag; }
+  .wg-browser { padding-top: env(titlebar-area-height, 40px); }
+  /* the dashboard keeps clear of the caption area too */
+  .app { padding-top: calc(env(titlebar-area-height, 0px) + 8px); }
+  .app::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: env(titlebar-area-width, 100%);
+    height: env(titlebar-area-height, 0px);
+    app-region: drag;
+    -webkit-app-region: drag;
+  }
+}

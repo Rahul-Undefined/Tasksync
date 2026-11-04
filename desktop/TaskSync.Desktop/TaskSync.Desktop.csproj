@@ -10,7 +10,7 @@
     <RootNamespace>TaskSync.Desktop</RootNamespace>
     <ApplicationIcon>Assets\tasksync.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Product>TaskSync</Product>
     <Company>Omnifi</Company>
     <Description>TaskSync desktop companion — floating task widget for Windows</Description>

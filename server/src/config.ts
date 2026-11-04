@@ -49,6 +49,8 @@ const envSchema = z.object({
   DATA_ENCRYPTION_KEY: z.string().optional(),
   /** Set by Render, e.g. "Rahul-Undefined/Tasksync"; used to guess the data repository's owner. */
   RENDER_GIT_REPO_SLUG: z.string().optional(),
+  /** Public GitHub repository whose "desktop-v*" releases the Windows app updates from (default: the code repo). */
+  DESKTOP_RELEASES_REPO: z.string().trim().regex(/^[\w.-]+\/[\w.-]+$/, 'must be owner/name').optional(),
 
   ENTRA_TENANT_ID: uuid.optional(),
   ENTRA_CLIENT_ID: uuid.optional(),
@@ -125,6 +127,8 @@ export interface AppConfig {
   webDistDir: string;
   devAuth: boolean;
   realtimeRetentionHours: number;
+  /** Where the Windows app looks for updates (GitHub releases tagged desktop-vX.Y.Z). */
+  desktopReleases: { repo?: string; apiUrl: string };
   version: string;
 }
 
@@ -207,6 +211,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webDistDir: e.WEB_DIST_DIR ?? path.resolve(here, '../../web/dist'),
     devAuth: e.DEV_AUTH,
     realtimeRetentionHours: e.REALTIME_RETENTION_HOURS,
+    desktopReleases: { repo: e.DESKTOP_RELEASES_REPO ?? e.RENDER_GIT_REPO_SLUG, apiUrl: e.GITHUB_API_URL },
     version: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.npm_package_version ?? packageVersion(),
   };
 }

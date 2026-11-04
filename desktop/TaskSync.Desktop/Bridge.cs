@@ -12,7 +12,7 @@ public sealed record BridgeMessage(string Type, JsonElement Payload)
     {
         "notify", "copyImage", "openExternal", "openDashboard", "setMode", "setAlwaysOnTop",
         "setAutoStart", "startDrag", "minimizeToTray", "getState", "setBadge",
-        "setHideFromCapture", "setStayOnDesktop",
+        "setHideFromCapture", "setStayOnDesktop", "restartToUpdate",
     };
 
     public static bool TryParse(string? json, out BridgeMessage? message)
@@ -58,7 +58,8 @@ public sealed record HostState(
     [property: JsonPropertyName("autoStart")] bool AutoStart,
     [property: JsonPropertyName("mode")] string Mode,
     [property: JsonPropertyName("hideFromCapture")] bool HideFromCapture = true,
-    [property: JsonPropertyName("stayOnDesktop")] bool StayOnDesktop = true)
+    [property: JsonPropertyName("stayOnDesktop")] bool StayOnDesktop = true,
+    [property: JsonPropertyName("updateReady")] string? UpdateReady = null)
 {
     public string ToMessageJson() =>
         JsonSerializer.Serialize(new { type = "hostState", state = this });
@@ -69,6 +70,7 @@ public static class HostMessages
     public static string OpenTask(string taskId) => JsonSerializer.Serialize(new { type = "openTask", taskId });
     public static string Navigate(string path) => JsonSerializer.Serialize(new { type = "navigate", path });
     public static string Resume() => JsonSerializer.Serialize(new { type = "resume" });
+    public static string OpenSheet(string sheet) => JsonSerializer.Serialize(new { type = "openSheet", sheet });
 
     public static bool IsTaskId(string? id) => Guid.TryParse(id, out _) && id!.Length == 36;
 }

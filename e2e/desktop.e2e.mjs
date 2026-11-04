@@ -115,13 +115,13 @@ describe('Windows desktop companion', () => {
     await waitForLog('started');
     assert.match(page.url(), /\/widget$/, 'the desktop app opens the widget route');
     await page.getByRole('button', { name: /^Alex Morgan/ }).click();
-    await page.locator('.widget .conn.live').waitFor({ timeout: 15000 });
+    await page.locator('.widget .wg-dot.live').waitFor({ timeout: 15000 });
     // Host state reached the page through the bridge (pinned on top by default).
-    await page.getByTitle('Unpin from top').waitFor();
+    await page.getByRole('button', { name: 'On top', pressed: true }).waitFor();
   });
 
   test('[T19] always-on-top toggle and compact/expanded modes change the real window', async () => {
-    await page.getByTitle('Unpin from top').click();
+    await page.getByRole('button', { name: 'On top', pressed: true }).click();
     const pin = await waitForLog('setAlwaysOnTop', (d) => d.value === false);
     assert.equal(pin.data.topMost, false, 'WinForms TopMost must follow the toggle');
     await page.getByTitle('Expand').click();
@@ -214,8 +214,8 @@ describe('Windows desktop companion', () => {
     assert.ok(settings.ExpandedBounds?.Width > 0 && settings.CompactBounds?.Width > 0);
     ({ child: app, browser: cdp, page } = await launchApp());
     // No sign-in click needed: the WebView2 profile kept the session.
-    await page.locator('.widget .conn.live').waitFor({ timeout: 20000 });
-    await page.getByTitle('Keep on top').waitFor(); // persisted "not on top"
+    await page.locator('.widget .wg-dot.live').waitFor({ timeout: 20000 });
+    await page.getByRole('button', { name: 'On top', pressed: false }).waitFor(); // persisted "not on top"
     await page.getByTitle('Compact').waitFor(); // persisted expanded mode
   });
 

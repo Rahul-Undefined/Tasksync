@@ -31,6 +31,24 @@ public sealed class AutoStart
         }
     }
 
+    /// <summary>"Start with Windows" is on, possibly for another copy (e.g. the version before an update).</summary>
+    public bool IsRegistered
+    {
+        get
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(_keyPath, writable: false);
+            return key?.GetValue(ValueName) is string value && value.Contains(Updater.ExeName, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>After an update the exe lives in a new folder: point "Start with Windows" at it.</summary>
+    public bool RefreshPath()
+    {
+        if (IsEnabled || !IsRegistered || !_exePath.EndsWith(Updater.ExeName, StringComparison.OrdinalIgnoreCase)) return false;
+        Set(true);
+        return true;
+    }
+
     public void Set(bool enabled)
     {
         using var key = Registry.CurrentUser.CreateSubKey(_keyPath, writable: true);

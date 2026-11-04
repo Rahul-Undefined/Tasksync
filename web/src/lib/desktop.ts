@@ -10,13 +10,16 @@ export interface HostState {
   hideFromCapture: boolean;
   /** Widget stays visible on Show Desktop (Win+D), Win+M and desktop peek. */
   stayOnDesktop: boolean;
+  /** A newer Windows app version has been downloaded and starts on restart. */
+  updateReady?: string | null;
 }
 
 type HostMessage =
   | { type: 'hostState'; state: HostState }
   | { type: 'openTask'; taskId: string }
   | { type: 'navigate'; path: string }
-  | { type: 'resume' };
+  | { type: 'resume' }
+  | { type: 'openSheet'; sheet: string };
 
 interface WebViewBridge {
   postMessage(message: unknown): void;
@@ -81,6 +84,9 @@ export const desktop = {
   },
   minimizeToTray() {
     send('minimizeToTray');
+  },
+  restartToUpdate() {
+    send('restartToUpdate');
   },
   requestState() {
     send('getState');

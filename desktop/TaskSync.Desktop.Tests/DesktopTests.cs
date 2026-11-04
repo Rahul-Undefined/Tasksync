@@ -189,7 +189,7 @@ public class BridgeTests
     public void HostStateSerialisesForTheWebUi()
     {
         var json = new HostState("1.2.3", true, false, "compact", true, false).ToMessageJson();
-        Assert.Equal("""{"type":"hostState","state":{"version":"1.2.3","alwaysOnTop":true,"autoStart":false,"mode":"compact","hideFromCapture":true,"stayOnDesktop":false}}""", json);
+        Assert.Equal("""{"type":"hostState","state":{"version":"1.2.3","alwaysOnTop":true,"autoStart":false,"mode":"compact","hideFromCapture":true,"stayOnDesktop":false,"updateReady":null}}""", json);
         Assert.True(HostMessages.IsTaskId(Guid.NewGuid().ToString()));
         Assert.False(HostMessages.IsTaskId("../../etc"));
     }
