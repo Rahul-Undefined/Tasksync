@@ -157,7 +157,7 @@ export async function userRoutes(app: FastifyInstance, { auth, db, mutate, hub }
         targetType: r.target_type,
         targetId: r.target_id,
         ip: r.ip,
-        data: r.data,
+        data: typeof r.data === 'string' ? JSON.parse(r.data) : r.data,
         actor: r.actor_name,
         createdAt: iso(r.created_at),
       })),

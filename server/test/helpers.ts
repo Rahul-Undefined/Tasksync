@@ -6,6 +6,7 @@ import { inject } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { createPgliteDatabase, createPostgresDatabase, type Database } from '../src/db/database.js';
+import { createSqliteDatabase } from '../src/db/sqlite.js';
 import { runMigrations } from '../src/db/migrate.js';
 import { createTokenVerifier } from '../src/auth/verify.js';
 import type { RealtimeHub } from '../src/realtime/hub.js';
@@ -159,7 +160,8 @@ export async function createTestEnv(envOverrides: Record<string, string> = {}, s
 }
 
 /** A fresh, isolated database per test environment: real PostgreSQL when TEST_DB=postgres, else PGlite. */
-async function createTestDatabase(): Promise<Database> {
+export async function createTestDatabase(): Promise<Database> {
+  if (process.env.TEST_DB === 'sqlite') return createSqliteDatabase(':memory:');
   const adminUrl = inject('pgUrl');
   if (!adminUrl) return createPgliteDatabase('memory');
   const name = `ts_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;

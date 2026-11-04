@@ -61,7 +61,7 @@ export async function notify(q: Queryable, outbox: Outbox, n: NotifyInput): Prom
       `SELECT ${pref} AS enabled FROM user_preferences WHERE user_id = $1`,
       [n.userId],
     );
-    if (rows[0] && rows[0].enabled === false) return;
+    if (rows[0] && !rows[0].enabled) return; // false (PostgreSQL) or 0 (SQLite)
   }
   const { rows } = await q.query<{ id: string; created_at: Date | string }>(
     `INSERT INTO notifications (user_id, task_id, actor_id, type, title, body)

@@ -61,9 +61,10 @@ export async function readEventsSince(q: Queryable, userId: string, since: numbe
 /** Deletes delivered events older than the retention window and records the prune horizon. */
 export async function pruneEvents(db: Database, retentionHours: number): Promise<number> {
   return db.withLock(74_221_002, async () => {
+    const olderThan = new Date(Date.now() - retentionHours * 3600_000).toISOString();
     const { rows } = await db.query<{ id: string | number | null }>(
-      `SELECT max(id) AS id FROM realtime_events WHERE created_at < now() - make_interval(hours => $1)`,
-      [retentionHours],
+      `SELECT max(id) AS id FROM realtime_events WHERE created_at < $1::timestamptz`,
+      [olderThan],
     );
     const cutoff = Number(rows[0]?.id ?? 0);
     if (!cutoff) return 0;

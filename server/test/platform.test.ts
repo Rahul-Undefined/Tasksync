@@ -205,7 +205,7 @@ describe('Local development sign-in', () => {
 });
 
 describe('Database lock-down', () => {
-  it('enables row level security on every application table', async () => {
+  it.skipIf(process.env.TEST_DB === 'sqlite')('enables row level security on every application table', async () => {
     const env = await createTestEnv();
     try {
       const { rows } = await env.db.query<{ relname: string; relrowsecurity: boolean }>(

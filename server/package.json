@@ -10,7 +10,8 @@
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:pg": "node ../scripts/with-env.mjs TEST_DB=postgres -- vitest run"
+    "test:pg": "node ../scripts/with-env.mjs TEST_DB=postgres -- vitest run",
+    "test:sqlite": "node ../scripts/with-env.mjs TEST_DB=sqlite -- vitest run"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.14",

@@ -12,6 +12,7 @@ Microsoft accounts yet, because the Entra app registration and Supabase project 
 |---|---|---|
 | API integration: auth (incl. no-admin ID-token sign-in), onboarding, task workflow, permissions, realtime, hardening, zero-paperwork config, **GitHub snapshot storage** (encryption, exact restore, fake GitHub API incl. empty repo and bad token, restart restore, outage safety, failed-save retry, shutdown flush) (in-memory PostgreSQL / PGlite) | `npm test -w server` | **75 passed / 0 failed** |
 | Same 75 tests against a **real PostgreSQL 18 server** (concurrent connections, row locks) | `npm run test:pg` | **75 passed / 0 failed** |
+| Same API suite on **SQLite** (the engine used with GitHub storage on Render) | `npm run test:sqlite -w server` | **74 passed / 0 failed / 1 skipped** (PostgreSQL-only row-level-security check) |
 | Web unit: realtime client (dedupe, backoff, 4401/4403, resync incl. cursor going down after a restore, HTTP fallback), ID-token refresh timing, list rules, mentions, Teams links | `npm test -w web` | **21 passed / 0 failed** |
 | Desktop unit: settings, off-screen recovery, auto-start (throwaway registry key), URL allowlists, bridge validation, real clipboard | `npm run test:desktop` | **42 passed / 0 failed** |
 | Web E2E in **Microsoft Edge**, two separate user profiles (incl. installable-app manifest and pop-out widget) | `npm run test:e2e` | **7 passed / 0 failed** |
@@ -75,6 +76,11 @@ That session also found two UI bugs, both fixed (stale mention directory; contex
 GitHub storage was also checked with the **real built server**: a task was created, auto-saved to a
 (fake) GitHub API as an encrypted snapshot plus daily backup, the process was killed, and a fresh process restored
 it. The real GitHub API hasn't been exercised yet; that happens on the first Render start with your token.
+
+Memory on Render Free (512 MB): the first GitHub-storage deploy was killed ("Out of memory, used over 512Mi").
+Measured locally, an embedded PostgreSQL (PGlite) briefly peaks at ~970 MB while starting (exact `maxRSS`), even
+with V8 flags (best: ~616 MB). It was replaced by Node's built-in SQLite: the whole production server now peaks at
+**111 MB**, and a real-binary restart check (create → auto-save → kill → fresh start) restored task, comment and history.
 
 ## Bugs found by testing and fixed
 

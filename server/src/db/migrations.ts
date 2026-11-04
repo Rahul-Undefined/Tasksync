@@ -219,3 +219,31 @@ $$;
 `,
   },
 ];
+
+/** Migrations whose purpose only exists on PostgreSQL (Supabase API lock-down). */
+const POSTGRES_ONLY = new Set(['002_lock_down_data_api']);
+
+/**
+ * The same schema for SQLite, derived mechanically so the two can't drift apart:
+ * PostgreSQL types become SQLite storage classes, identity columns become AUTOINCREMENT,
+ * and expression defaults are parenthesised.
+ */
+export function toSqliteDdl(sql: string): string {
+  return sql
+    .replace(/\bbigint\s+GENERATED\s+ALWAYS\s+AS\s+IDENTITY\s+PRIMARY\s+KEY\b/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
+    .replace(/\bDEFAULT\s+gen_random_uuid\(\)/gi, 'DEFAULT (gen_random_uuid())')
+    .replace(/\bDEFAULT\s+now\(\)/gi, 'DEFAULT (now())')
+    .replace(/'(\{\}|\[\])'::jsonb?/gi, "'$1'")
+    .replace(/\bDEFAULT\s+true\b/gi, 'DEFAULT 1')
+    .replace(/\bDEFAULT\s+false\b/gi, 'DEFAULT 0')
+    .replace(/\bposition\('@'\s+IN\s+email\)/gi, "instr(email, '@')")
+    .replace(/\bchar_length\(btrim\(/gi, 'length(trim(')
+    .replace(/\bchar_length\(/gi, 'length(')
+    .replace(/\b(uuid|timestamptz|jsonb?)\b(?=\s|,|\))/gi, 'TEXT')
+    .replace(/\bboolean\b/gi, 'INTEGER');
+}
+
+export function migrationsFor(kind: 'postgres' | 'pglite' | 'sqlite'): Migration[] {
+  if (kind !== 'sqlite') return migrations;
+  return migrations.map((m) => ({ id: m.id, sql: POSTGRES_ONLY.has(m.id) ? 'SELECT 1;' : toSqliteDdl(m.sql) }));
+}

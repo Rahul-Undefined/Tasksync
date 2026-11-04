@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import pg from 'pg';
 import { isSupabaseHost, SUPABASE_ROOT_CA_2021 } from './supabase-ca.js';
+import { createSqliteDatabase } from './sqlite.js';
 import type { AppConfig } from '../config.js';
 
 export interface QueryResult<T> {
@@ -17,7 +18,7 @@ export interface Tx extends Queryable {
 }
 
 export interface Database extends Queryable {
-  readonly kind: 'postgres' | 'pglite';
+  readonly kind: 'postgres' | 'pglite' | 'sqlite';
   /** Runs a multi-statement SQL script (used by migrations). */
   exec(sql: string): Promise<void>;
   /** Runs `fn` inside a transaction. The transaction is rolled back if `fn` throws. */
@@ -180,8 +181,9 @@ export async function createPgliteDatabase(dataDir?: string): Promise<Database> 
 
 export async function createDatabase(config: AppConfig): Promise<Database | null> {
   if (config.database.url) return createPostgresDatabase(config.database);
-  // GitHub storage: the live database is in memory; Persistence restores and saves it.
-  if (config.storage.mode === 'github') return config.storage.github ? createPgliteDatabase('memory') : null;
+  // GitHub storage: the live database is in-memory SQLite (a few MB, fits Render Free's 512 MB);
+  // Persistence restores and saves it.
+  if (config.storage.mode === 'github') return config.storage.github ? createSqliteDatabase(':memory:') : null;
   if (config.env !== 'production' && config.database.pgliteDir) {
     return createPgliteDatabase(config.database.pgliteDir);
   }

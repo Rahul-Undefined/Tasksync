@@ -10,7 +10,7 @@
     "web"
   ],
   "engines": {
-    "node": ">=20.19"
+    "node": ">=22.13"
   },
   "scripts": {
     "build": "npm run build -w shared && npm run build -w server && npm run build -w web",

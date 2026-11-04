@@ -24,8 +24,12 @@ UI (`/widget` route), so features ship to both at once.
 ## Data storage without a database service
 
 Render Free has no persistent disk and its free PostgreSQL expires after 30 days, and the project only uses
-GitHub and Render. So, unless `DATABASE_URL` is set, TaskSync runs **PostgreSQL in-process (PGlite)** and makes it
-durable with **encrypted snapshots in a private GitHub repository** (`server/src/storage/`):
+GitHub and Render. So, unless `DATABASE_URL` is set, TaskSync runs **Node's built-in SQLite in memory**
+(`server/src/db/sqlite.ts`, ~110 MB peak for the whole server; an embedded PostgreSQL (PGlite) was tried first but
+briefly needs ~1 GB at start-up and was killed by Render's 512 MB limit) and makes it durable with
+**encrypted snapshots in a private GitHub repository** (`server/src/storage/`). The SQLite schema is derived from the
+PostgreSQL migrations, and the adapter translates the few PostgreSQL-only forms the queries use (`$1`, casts,
+`= ANY(array)`, `FOR UPDATE`); the full API test suite runs on SQLite, PGlite and PostgreSQL.
 
 - `snapshot.ts`: logical JSON export/import of all tables (parents before children, identity sequences and the
   realtime event cursor carried over, new columns get defaults, all in one transaction).

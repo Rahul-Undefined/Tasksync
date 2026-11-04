@@ -149,7 +149,7 @@ describe('Realtime synchronisation', () => {
     const ready = (await c.waitFor(isReady)) as Extract<ServerMessage, { type: 'ready' }>;
     c.ws.close();
     await env.req('POST', '/api/tasks', rahul.token, { title: 'Before prune', assigneeIds: [stella.id] });
-    await env.db.query(`UPDATE realtime_events SET created_at = now() - interval '10 days'`);
+    await env.db.query('UPDATE realtime_events SET created_at = $1', [new Date(Date.now() - 10 * 86400_000).toISOString()]);
     await pruneEvents(env.db, 72);
     const again = await connect(stella.token, ready.lastEventId);
     await again.waitFor((m) => m.type === 'resync');

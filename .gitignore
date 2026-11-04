@@ -21,3 +21,6 @@ playwright-report/
 
 # Local tooling
 .claude/
+
+# Local secrets notes (never commit)
+Codes/

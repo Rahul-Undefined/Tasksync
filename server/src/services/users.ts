@@ -197,7 +197,8 @@ export async function searchDirectory(q: Queryable, query: string | undefined, l
   const { rows } = await q.query<UserRow>(
     `${USER_SELECT}
      WHERE u.status = 'approved'
-       AND ($1 = '' OR lower(u.display_name) LIKE $2 OR u.email LIKE $2 OR lower(coalesce(p.department, '')) LIKE $2)
+       AND ($1 = '' OR lower(u.display_name) LIKE $2 ESCAPE '\\' OR u.email LIKE $2 ESCAPE '\\'
+            OR lower(coalesce(p.department, '')) LIKE $2 ESCAPE '\\')
      ORDER BY lower(u.display_name)
      LIMIT $3`,
     [term, like, Math.min(Math.max(limit, 1), 200)],
@@ -264,11 +265,12 @@ export async function getPreferences(q: Queryable, userId: string): Promise<Pref
   const { rows } = await q.query<PrefRow>('SELECT * FROM user_preferences WHERE user_id = $1', [userId]);
   const r = rows[0];
   return {
-    notifyAssigned: r?.notify_assigned ?? true,
-    notifyStatus: r?.notify_status ?? true,
-    notifyComments: r?.notify_comments ?? true,
-    desktopToasts: r?.desktop_toasts ?? true,
-    widgetCompact: r?.widget_compact ?? true,
+    // Boolean() because SQLite returns 1/0
+    notifyAssigned: Boolean(r?.notify_assigned ?? true),
+    notifyStatus: Boolean(r?.notify_status ?? true),
+    notifyComments: Boolean(r?.notify_comments ?? true),
+    desktopToasts: Boolean(r?.desktop_toasts ?? true),
+    widgetCompact: Boolean(r?.widget_compact ?? true),
   };
 }
 

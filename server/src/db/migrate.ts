@@ -1,5 +1,5 @@
 import type { Database } from './database.js';
-import { migrations } from './migrations.js';
+import { migrationsFor, toSqliteDdl } from './migrations.js';
 
 const MIGRATION_LOCK_KEY = 74_221_001;
 
@@ -32,14 +32,15 @@ $$;
 
 export async function runMigrations(db: Database, log: (msg: string) => void = () => undefined): Promise<string[]> {
   return db.withLock(MIGRATION_LOCK_KEY, async () => {
-    await db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    const createTable = `CREATE TABLE IF NOT EXISTS schema_migrations (
       id text PRIMARY KEY,
       applied_at timestamptz NOT NULL DEFAULT now()
-    )`);
+    )`;
+    await db.exec(db.kind === 'sqlite' ? toSqliteDdl(createTable) : createTable);
     const { rows } = await db.query<{ id: string }>('SELECT id FROM schema_migrations');
     const applied = new Set(rows.map((r) => r.id));
     const ran: string[] = [];
-    for (const m of migrations) {
+    for (const m of migrationsFor(db.kind)) {
       if (applied.has(m.id)) continue;
       log(`applying migration ${m.id}`);
       await db.tx(async (q) => {
@@ -48,7 +49,7 @@ export async function runMigrations(db: Database, log: (msg: string) => void = (
       });
       ran.push(m.id);
     }
-    await db.exec(LOCKDOWN_SQL);
+    if (db.kind !== 'sqlite') await db.exec(LOCKDOWN_SQL);
     return ran;
   });
 }

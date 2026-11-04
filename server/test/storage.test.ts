@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { openSnapshot, sealSnapshot, SnapshotDecryptError } from '../src/storage/crypto.js';
 import { GitHubSnapshotStore, type SnapshotStore } from '../src/storage/github.js';
 import { exportSnapshot, importSnapshot } from '../src/storage/snapshot.js';
-import { createPgliteDatabase } from '../src/db/database.js';
+
 import { runMigrations } from '../src/db/migrate.js';
 import { latestEventId } from '../src/realtime/replay.js';
 import { loadConfig } from '../src/config.js';
 import { startFakeGitHub, type FakeGitHub } from './fake-github.js';
-import { createTestEnv, type TestEnv } from './helpers.js';
+import { createTestDatabase, createTestEnv, type TestEnv } from './helpers.js';
 
 const KEY = 'correct horse battery staple — test only';
 const cleanups: (() => Promise<void>)[] = [];
@@ -56,7 +56,7 @@ describe('Snapshot export/import', () => {
     const snapshot = await exportSnapshot(env.db);
     const seq = await latestEventId(env.db);
 
-    const fresh = await createPgliteDatabase('memory');
+    const fresh = await createTestDatabase();
     cleanups.push(() => fresh.close());
     await runMigrations(fresh);
     await importSnapshot(fresh, JSON.parse(JSON.stringify(snapshot)));
@@ -141,7 +141,7 @@ describe('TaskSync with GitHub storage', () => {
     void config;
     const { Persistence, trackWrites } = await import('../src/storage/persistence.js');
     const { buildApp } = await import('../src/app.js');
-    const raw = await createPgliteDatabase('memory');
+    const raw = await createTestDatabase();
     await runMigrations(raw);
     const p = new Persistence(raw, storeFor(gh), KEY, { log: () => {} });
     const startPromise = p.start();
