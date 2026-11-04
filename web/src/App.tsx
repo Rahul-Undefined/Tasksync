@@ -5,6 +5,7 @@ import { createDevAuth, createEntraAuth, type AuthClient, type ClientConfig } fr
 import { desktop } from './lib/desktop';
 import { RealtimeClient, realtimeUrl, type PollResult } from './lib/realtime';
 import { navigate, usePath } from './lib/router';
+import { appOpensAsWidget, isInstalledApp, shapeAppWindow } from './lib/pwa';
 import {
   applyEvent,
   flushOutbox,
@@ -97,6 +98,7 @@ export function App() {
     if (phase.kind !== 'ready') return;
     const { auth, config } = phase;
     loadAll().catch((err) => toast({ kind: 'error', title: 'Could not load tasks', body: errorMessage(err) }));
+    let lastSync = Date.now();
     const client = new RealtimeClient({
       url: realtimeUrl(),
       getToken: (o) => auth.getToken(o),
@@ -104,6 +106,7 @@ export function App() {
       onResync: () => void loadAll().catch(() => undefined),
       onStatus: setConnection,
       onReady: (reconnected) => {
+        lastSync = Date.now();
         void flushOutbox();
         // After a reconnect the replayed events cover the gap, but a full refresh also
         // repairs anything stale (e.g. tasks we lost access to while offline).
@@ -114,13 +117,47 @@ export function App() {
     });
     realtime.current = client;
     client.start();
+
+    // Morning / wake-up refresh: after the window has been hidden or the PC asleep for a while,
+    // reload everything so the widget shows the latest tasks (realtime replay covers short gaps).
+    let hiddenAt = 0;
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > 2 * 60_000) {
+        void loadAll().catch(() => undefined);
+        client.reconnectNow();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    const staleTimer = setInterval(() => {
+      // Timers pause while the PC sleeps, so a big gap between ticks means it just woke up.
+      if (Date.now() - lastSync > 10 * 60_000) {
+        lastSync = Date.now();
+        void loadAll().catch(() => undefined);
+      }
+    }, 60_000);
     setUserUpdatedHandler((d) => {
       if (d.userId === getState().me?.id) void loadMe(config, auth);
       else void refreshDirectory().catch(() => undefined);
       window.dispatchEvent(new CustomEvent('tasksync:users-changed'));
     });
-    return () => client.stop();
+    return () => {
+      client.stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(staleTimer);
+    };
   }, [phase.kind === 'ready' ? phase.auth : null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The installed Windows app opens as the small widget (one window, no separate dashboard).
+  useEffect(() => {
+    if (phase.kind !== 'ready' || !isInstalledApp() || !appOpensAsWidget()) return;
+    if (sessionStorage.getItem('tasksync.launched')) return; // only on app start, not every navigation
+    sessionStorage.setItem('tasksync.launched', '1');
+    if (window.location.pathname === '/') {
+      navigate('/widget', true);
+      shapeAppWindow('widget');
+    }
+  }, [phase.kind]);
 
   // While waiting for approval, poll so the screen updates as soon as an admin approves.
   useEffect(() => {

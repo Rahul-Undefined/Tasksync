@@ -4,7 +4,8 @@ import { Bell, Download, LogOut, Monitor, PictureInPicture2, Save, UserRound } f
 import { Avatar, Switch } from '../components/ui';
 import { desktop, isDesktop, type HostState } from '../lib/desktop';
 import { floatingWidgetSupported, openFloatingWidget } from '../lib/pip';
-import { isInstalledApp, promptInstall, useCanInstall } from '../lib/pwa';
+import { appOpensAsWidget, isInstalledApp, promptInstall, setAppOpensAsWidget, shapeAppWindow, useCanInstall } from '../lib/pwa';
+import { navigate } from '../lib/router';
 import { savePreferences, saveProfile, toast, toastError, useStore } from '../lib/store';
 
 export function SettingsPage({ onSignOut, version }: { onSignOut: () => void; version: string }) {
@@ -208,14 +209,40 @@ export function SettingsPage({ onSignOut, version }: { onSignOut: () => void; ve
 function DesktopWithoutInstall() {
   const canInstall = useCanInstall();
   const installed = isInstalledApp();
+  const [asWidget, setAsWidget] = useState(appOpensAsWidget());
   return (
     <div className="col" style={{ gap: 14 }}>
+      {installed && (
+        <div className="row wrap" style={{ gap: 14 }}>
+          <div className="col" style={{ gap: 0, flex: '1 1 240px' }}>
+            <strong>Open the app as a widget</strong>
+            <span className="small faint">The TaskSync app starts as the small task widget instead of the full dashboard.</span>
+          </div>
+          <Switch
+            label="Open the app as a widget"
+            on={asWidget}
+            onChange={(v) => {
+              setAppOpensAsWidget(v);
+              setAsWidget(v);
+            }}
+          />
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              shapeAppWindow('widget');
+              navigate('/widget');
+            }}
+          >
+            Switch to widget now
+          </button>
+        </div>
+      )}
       <div className="row wrap" style={{ gap: 14 }}>
         <div className="col" style={{ gap: 0, flex: '1 1 240px' }}>
           <strong>{installed ? 'Installed as an app' : 'Install TaskSync as an app'}</strong>
           <span className="small faint">
             {installed
-              ? 'TaskSync has its own window and taskbar icon. To open it when Windows starts: open edge://apps, right-click TaskSync and tick “Start automatically when you sign in”.'
+              ? 'To open it every morning automatically: in Edge go to edge://apps, right-click TaskSync, tick “Auto-start on device login” (or “Start app when you sign in”).'
               : 'Uses Microsoft Edge, so no download or admin rights are needed. You get a TaskSync window, taskbar icon with a task count, and Windows notifications.'}
           </span>
         </div>

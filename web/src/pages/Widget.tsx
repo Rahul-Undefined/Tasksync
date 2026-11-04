@@ -5,6 +5,7 @@ import { TaskComposer } from '../components/TaskComposer';
 import { ConnectionPill } from '../components/ui';
 import { desktop, isDesktop, type HostState } from '../lib/desktop';
 import { navigate } from '../lib/router';
+import { shapeAppWindow } from '../lib/pwa';
 import { floatingWidgetSupported, openFloatingWidget } from '../lib/pip';
 import { relativeTime } from '../lib/format';
 import { markNotificationsRead, openTask, useStore } from '../lib/store';
@@ -59,7 +60,10 @@ export function WidgetPage({
   const openDashboard = () => {
     if (isHost) desktop.openDashboard('/');
     else if (variant === 'pip') window.focus(); // the dashboard is the window that opened this one
-    else navigate('/');
+    else {
+      shapeAppWindow('dashboard');
+      navigate('/');
+    }
   };
 
   const list = tab === 'my' ? my : assigned;

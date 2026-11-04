@@ -58,3 +58,49 @@ export function setTaskbarBadge(count: number) {
     // not supported
   }
 }
+
+// ---------------------------------------------------------------------------
+// Installed-app window as the widget
+// ---------------------------------------------------------------------------
+
+const WIDGET_PREF = 'tasksync.appOpensAsWidget';
+
+/** Whether the installed app should open as the small widget (default) instead of the full dashboard. */
+export function appOpensAsWidget(): boolean {
+  try {
+    return localStorage.getItem(WIDGET_PREF) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+export function setAppOpensAsWidget(value: boolean) {
+  try {
+    localStorage.setItem(WIDGET_PREF, String(value));
+  } catch {
+    // storage unavailable: keep the default
+  }
+}
+
+/**
+ * Best-effort resize of the installed app window (Edge allows this for app windows; in a
+ * normal tab it's ignored). Edge also remembers the size you leave the app window at.
+ */
+export function shapeAppWindow(kind: 'widget' | 'dashboard') {
+  if (!isInstalledApp()) return;
+  try {
+    if (kind === 'widget') {
+      const w = 400;
+      const h = Math.min(680, screen.availHeight - 40);
+      window.resizeTo(w, h);
+      window.moveTo(screen.availWidth - w - 16, screen.availHeight - h - 16);
+    } else {
+      const w = Math.min(1280, screen.availWidth - 80);
+      const h = Math.min(860, screen.availHeight - 60);
+      window.resizeTo(w, h);
+      window.moveTo(Math.round((screen.availWidth - w) / 2), Math.round((screen.availHeight - h) / 2));
+    }
+  } catch {
+    // not allowed here
+  }
+}
