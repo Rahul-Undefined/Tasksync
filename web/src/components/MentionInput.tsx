@@ -127,6 +127,16 @@ export function MentionInput(props: MentionInputProps) {
   return (
     <div className="mention-wrap">
       {multiline ? <textarea className="textarea" {...common} /> : <input className="input" {...common} />}
+      {mention && matches.length === 0 && (
+        <div className="popover glass glass-strong" role="status" style={{ top: 'calc(100% + 6px)', left: 0, padding: 12, maxWidth: 320 }}>
+          <div className="small">
+            No colleague matches <strong>@{mention.query}</strong>.
+          </div>
+          <div className="tiny faint" style={{ marginTop: 4 }}>
+            Colleagues appear here after they sign in to TaskSync once and an admin approves them (Admin → Access requests).
+          </div>
+        </div>
+      )}
       {open && (
         <div className="popover glass glass-strong" role="listbox" style={{ top: 'calc(100% + 6px)', left: 0 }}>
           {matches.map((u, i) => (

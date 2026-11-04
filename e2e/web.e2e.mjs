@@ -141,7 +141,11 @@ describe('Web dashboard in Microsoft Edge', () => {
       null,
       { timeout: 10000 },
     );
+    // The main window steps aside while the widget floats, and comes back when it closes.
+    await admin.getByText('Widget mode is on').waitFor();
     await admin.evaluate(() => window.documentPictureInPicture.window.close());
+    await admin.getByText('Widget mode is on').waitFor({ state: 'detached' });
+    await admin.locator('.app').waitFor();
   });
 
   test('[T4][T5] a new employee waits for approval and gets in as soon as an admin approves', async () => {

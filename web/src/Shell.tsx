@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Bell, Check, CheckCheck, CloudOff, Inbox, ListTodo, PictureInPicture2, Send, Settings, ShieldCheck, Users, X } from 'lucide-react';
-import { floatingWidgetSupported, openFloatingWidget } from './lib/pip';
+import { closeFloatingWidget, floatingWidgetSupported, openFloatingWidget, useFloatingWidgetOpen } from './lib/pip';
 import { setTaskbarBadge } from './lib/pwa';
 import { PersonMenuHost } from './components/PersonMenu';
 import { TaskDrawer } from './components/TaskDrawer';
@@ -41,6 +41,7 @@ export function Shell({ onSignOut, onReconnect, version }: { onSignOut: () => vo
   const waking = useStore((s) => s.serverWaking);
   const unread = useStore((s) => s.unreadCount);
   const [bellOpen, setBellOpen] = useState(false);
+  const floating = useFloatingWidgetOpen();
 
   const routes = me.role === 'admin' ? [...ROUTES, ADMIN_ROUTE] : ROUTES;
   const current = routes.find((r) => r.path === path) ?? (path.startsWith('/team/') ? { ...ROUTES[4]!, label: 'Employee tasks' } : ROUTES[0]!);
@@ -71,6 +72,30 @@ export function Shell({ onSignOut, onReconnect, version }: { onSignOut: () => vo
       {counts[r.path] ? <span className="count">{counts[r.path]}</span> : null}
     </button>
   );
+
+  if (floating) {
+    // The widget runs in its own always-on-top window; this window must stay open but can be minimised.
+    return (
+      <div className="center-screen">
+        <div className="hero glass glass-strong">
+          <div className="brand-mark" style={{ width: 52, height: 52, borderRadius: 16 }}>
+            <PictureInPicture2 size={26} color="#fff" />
+          </div>
+          <h1 style={{ fontSize: 22 }}>Widget mode is on</h1>
+          <p className="tagline">
+            TaskSync is running in the floating widget. <strong>Minimise this window</strong> (don't close it: closing it
+            also closes the widget).
+          </p>
+          <button className="btn btn-primary" onClick={closeFloatingWidget}>
+            Back to full dashboard
+          </button>
+        </div>
+        <TaskDrawer />
+        <PersonMenuHost />
+        <Toasts />
+      </div>
+    );
+  }
 
   return (
     <div className="app">

@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { WidgetPage } from '../pages/Widget';
 import { toast } from './store';
@@ -16,6 +17,27 @@ const api = (): DocumentPictureInPicture | undefined =>
   (globalThis as { documentPictureInPicture?: DocumentPictureInPicture }).documentPictureInPicture;
 
 export const floatingWidgetSupported = () => typeof window !== 'undefined' && Boolean(api());
+
+// Whether the pop-out is open, so the main window can step aside (browsers keep it open while the
+// pop-out exists; it can be minimised but not hidden).
+let floating = false;
+const subs = new Set<() => void>();
+const setFloating = (v: boolean) => {
+  floating = v;
+  subs.forEach((s) => s());
+};
+export function useFloatingWidgetOpen(): boolean {
+  return useSyncExternalStore(
+    (s) => {
+      subs.add(s);
+      return () => subs.delete(s);
+    },
+    () => floating,
+  );
+}
+export function closeFloatingWidget() {
+  api()?.window?.close();
+}
 
 /** Must be called from a click (the browser requires a user gesture). */
 export async function openFloatingWidget(): Promise<void> {
@@ -58,5 +80,13 @@ export async function openFloatingWidget(): Promise<void> {
       <WidgetPage variant="pip" onClose={() => win.close()} />
     </SurfaceContext.Provider>,
   );
-  win.addEventListener('pagehide', () => root.unmount(), { once: true });
+  setFloating(true);
+  win.addEventListener(
+    'pagehide',
+    () => {
+      root.unmount();
+      setFloating(false);
+    },
+    { once: true },
+  );
 }
