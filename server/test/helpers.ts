@@ -70,6 +70,7 @@ export async function createTestEnv(envOverrides: Record<string, string> = {}, s
     BOOTSTRAP_ADMIN_EMAILS: ADMIN_EMAIL,
     WEB_DIST_DIR: './does-not-exist',
     RATE_LIMIT_PER_MINUTE: '100000',
+    AUTO_APPROVE_EMPLOYEES: 'false',
     ...envOverrides,
   });
   const rawDb = await createTestDatabase();

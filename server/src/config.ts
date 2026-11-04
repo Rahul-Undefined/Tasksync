@@ -64,6 +64,8 @@ const envSchema = z.object({
   ALLOW_GUEST_ACCOUNTS: boolish,
   ALLOWED_EMAIL_DOMAINS: csv,
   BOOTSTRAP_ADMIN_EMAILS: csv,
+  /** true (default): anyone with a verified company Microsoft account gets in without admin approval. */
+  AUTO_APPROVE_EMPLOYEES: z.enum(['true', 'false', '1', '0', 'yes', 'no']).optional(),
 
   PUBLIC_BASE_URL: z.string().url().optional(),
   /** Set automatically by Render (e.g. https://tasksync-vgam.onrender.com); used when PUBLIC_BASE_URL is unset. */
@@ -115,6 +117,7 @@ export interface AppConfig {
   };
   allowedEmailDomains: string[];
   bootstrapAdminEmails: string[];
+  autoApproveEmployees: boolean;
   publicBaseUrl?: string;
   corsOrigins: string[];
   trustProxy: boolean;
@@ -196,6 +199,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     allowedEmailDomains: domains,
     bootstrapAdminEmails: e.BOOTSTRAP_ADMIN_EMAILS.map((x) => x.toLowerCase()),
+    autoApproveEmployees: e.AUTO_APPROVE_EMPLOYEES === undefined ? true : ['true', '1', 'yes'].includes(e.AUTO_APPROVE_EMPLOYEES),
     publicBaseUrl: e.PUBLIC_BASE_URL ?? e.RENDER_EXTERNAL_URL,
     corsOrigins: e.CORS_ALLOWED_ORIGINS,
     trustProxy: cleaned.TRUST_PROXY === undefined ? production : e.TRUST_PROXY,

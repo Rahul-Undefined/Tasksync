@@ -1,3 +1,4 @@
+import { loadConfig } from '../src/config.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ADMIN_EMAIL, CLIENT, createTestEnv, DOMAIN, MSA_TENANT, OTHER_TENANT, TENANT, type TestEnv } from './helpers.js';
 
@@ -231,6 +232,34 @@ describe('Sign-in without admin consent (Entra ID tokens)', () => {
   it('tells the web app to sign in with basic scopes only by default', async () => {
     const cfg = (await env.req('GET', '/api/config')).body;
     expect(cfg.entra).toMatchObject({ tokenType: 'id', scopes: ['openid', 'profile', 'email'], clientId: CLIENT, tenantId: TENANT });
+  });
+});
+
+describe('Automatic access for company accounts (default)', () => {
+  it('lets a verified Omnifi account straight in, tells admins, and still allows deactivation', async () => {
+    const open = await createTestEnv({ AUTO_APPROVE_EMPLOYEES: 'true' });
+    try {
+      const admin = await open.admin();
+      const token = await open.mint(`walk.in@${DOMAIN}`, { name: 'Walk In' });
+      const me = await open.req('GET', '/api/me', token);
+      expect(me.body.user.status).toBe('approved');
+      expect((await open.req('GET', '/api/tasks', token)).status).toBe(200);
+      const notes = await open.req('GET', '/api/notifications', admin.token);
+      expect(notes.body.notifications.some((n: { title: string }) => n.title.includes('Walk In joined'))).toBe(true);
+      // still only company accounts
+      expect((await open.req('GET', '/api/me', await open.mint('x@gmail.com'))).status).toBe(403);
+      expect((await open.req('GET', '/api/me', await open.mint(`g@${DOMAIN}`, { tid: OTHER_TENANT }))).status).toBe(403);
+      // admins can still remove access
+      await open.req('POST', `/api/admin/users/${me.body.user.id}/deactivate`, admin.token, {});
+      expect((await open.req('GET', '/api/tasks', token)).body.error.code).toBe('account_deactivated');
+    } finally {
+      await open.close();
+    }
+  });
+
+  it('defaults to on in production config', () => {
+    expect(loadConfig({ NODE_ENV: 'production' }).autoApproveEmployees).toBe(true);
+    expect(loadConfig({ AUTO_APPROVE_EMPLOYEES: 'false' }).autoApproveEmployees).toBe(false);
   });
 });
 

@@ -237,6 +237,13 @@ includes 750 instance hours a month, enough for one service running all the time
 
 ## 5. Onboard employees
 
+**By default there is no approval step:** anyone signing in with a verified Omnifi Microsoft account
+(your tenant, `@myomnifi.com`, not a guest or personal account) gets in immediately, and admins get a
+"joined TaskSync" notification. To require approval again, set `AUTO_APPROVE_EMPLOYEES=false` in Render.
+Admins can always **deactivate** someone (Admin → All users), which blocks them at once.
+
+The steps below apply when approval is switched on:
+
 1. Share the link `https://tasksync-vgam.onrender.com`.
 2. Each person signs in with their Omnifi Microsoft account and sees **Waiting for approval**.
 3. An admin opens **Admin → Access requests → Approve**. The person's screen switches to TaskSync on its own.

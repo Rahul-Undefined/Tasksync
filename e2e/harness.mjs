@@ -30,6 +30,7 @@ export async function startServer({ port: fixedPort } = {}) {
       ...process.env,
       NODE_ENV: 'development',
       DEV_AUTH: 'true',
+      AUTO_APPROVE_EMPLOYEES: 'false', // the suite exercises the approval flow
       PGLITE_DATA_DIR: 'memory',
       PORT: String(port),
       HOST: '127.0.0.1',

@@ -81,6 +81,17 @@ export async function resolveUser(
   meta: { ip?: string; userAgent?: string } = {},
 ): Promise<UserRow> {
   const existing = await getUserByOid(db, identity.oid);
+  if (existing && existing.status === 'pending' && config.autoApproveEmployees) {
+    // Approval was switched off after this person signed in: let them in now.
+    await db.tx(async (q) => {
+      await q.query(`UPDATE users SET status = 'approved', approved_at = now(), updated_at = now() WHERE id = $1`, [existing.id]);
+      await q.query(
+        `INSERT INTO admin_approvals (user_id, action, from_status, to_status, reason) VALUES ($1, 'approved', 'pending', 'approved', $2)`,
+        [existing.id, 'Automatic: verified company Microsoft account'],
+      );
+    });
+    return resolveUser(db, identity, config, publish, makeOutbox, meta);
+  }
   if (existing) {
     const stale = !existing.last_login_at || Date.now() - new Date(existing.last_login_at).getTime() > LOGIN_TOUCH_MS;
     if (existing.email !== identity.email || existing.display_name !== identity.name || stale) {
@@ -99,6 +110,9 @@ export async function resolveUser(
   }
 
   const bootstrap = config.bootstrapAdminEmails.includes(identity.email);
+  // Verified company accounts get in straight away unless admin approval is switched on.
+  const auto = !bootstrap && config.autoApproveEmployees;
+  const approved = bootstrap || auto;
   try {
     let outbox: Outbox | undefined;
     const user = await db.tx(async (q) => {
@@ -113,8 +127,8 @@ export async function resolveUser(
           identity.email,
           identity.name,
           bootstrap ? 'admin' : 'employee',
-          bootstrap ? 'approved' : 'pending',
-          bootstrap ? new Date() : null,
+          approved ? 'approved' : 'pending',
+          approved ? new Date() : null,
         ],
       );
       if (!rows[0]) return null; // registered concurrently by another request
@@ -125,10 +139,10 @@ export async function resolveUser(
         `INSERT INTO admin_approvals (user_id, action, to_status, to_role, reason) VALUES ($1, $2, $3, $4, $5)`,
         [
           id,
-          bootstrap ? 'bootstrap_admin' : 'requested',
-          bootstrap ? 'approved' : 'pending',
+          bootstrap ? 'bootstrap_admin' : auto ? 'approved' : 'requested',
+          approved ? 'approved' : 'pending',
           bootstrap ? 'admin' : 'employee',
-          bootstrap ? 'Listed in BOOTSTRAP_ADMIN_EMAILS' : null,
+          bootstrap ? 'Listed in BOOTSTRAP_ADMIN_EMAILS' : auto ? 'Automatic: verified company Microsoft account' : null,
         ],
       );
       await audit(q, {
@@ -140,7 +154,30 @@ export async function resolveUser(
         userAgent: meta.userAgent,
         data: { email: identity.email },
       });
-      if (!bootstrap) {
+      if (auto) {
+        // Tell admins who joined, and every colleague to refresh the @mention directory.
+        outbox = makeOutbox(q);
+        const everyone = await q.query<{ id: string; role: string }>(
+          `SELECT id, role FROM users WHERE status = 'approved' AND id <> $1`,
+          [id],
+        );
+        for (const a of everyone.rows.filter((u) => u.role === 'admin')) {
+          await notify(q, outbox, {
+            userId: a.id,
+            type: 'account',
+            actorId: id,
+            taskId: null,
+            title: `${identity.name} joined TaskSync`,
+            body: `${identity.email} signed in with their Omnifi Microsoft account.`,
+          });
+        }
+        await outbox.emit(
+          everyone.rows.map((u) => u.id),
+          'user.updated',
+          null,
+          { userId: id, status: 'approved', directoryChanged: true },
+        );
+      } else if (!bootstrap) {
         outbox = makeOutbox(q);
         const admins = await q.query<{ id: string }>(
           `SELECT id FROM users WHERE role = 'admin' AND status = 'approved'`,
